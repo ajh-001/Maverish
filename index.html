@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Mobile OS Navigator</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- OS Branding -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/OrdnanceSurvey/os-api-branding@latest/os-api-branding.css" />
+    
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; background-color: #f3f4f6; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 10; }
+        
+        /* Custom User Location Marker */
+        .user-location-marker {
+            background-color: #3b82f6;
+            border: 3px solid #ffffff;
+            border-radius: 50%;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.7);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+
+        /* UI Overlays */
+        #ui-layer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 20; }
+        .pointer-events-auto { pointer-events: auto; }
+        
+        /* Drawer transitions */
+        .drawer-open { transform: translateX(0%); }
+        .drawer-closed { transform: translateX(-100%); }
+        
+        /* Modal transitions */
+        .modal-fade-in { opacity: 1; pointer-events: auto; }
+        .modal-fade-out { opacity: 0; pointer-events: none; }
+        
+        /* Hide scrollbar for drawer list */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="text-gray-800 font-sans antialiased">
+
+    <!-- Map Container -->
+    <div id="map"></div>
+
+    <!-- UI Overlay Layer -->
+    <div id="ui-layer" class="flex flex-col justify-between">
+        
+        <!-- Top Navigation Bar (Hidden by default) -->
+        <div id="nav-bar" class="bg-blue-600 text-white shadow-lg p-4 flex items-center justify-between transform -translate-y-full transition-transform duration-300 pointer-events-auto">
+            <div class="flex items-center space-x-4">
+                <div class="bg-blue-800 p-2 rounded-full transform transition-transform" id="nav-compass-container">
+                    <i data-lucide="navigation" id="nav-compass" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h2 class="text-sm font-semibold opacity-80">Navigating to</h2>
+                    <p id="nav-target-name" class="text-lg font-bold">Target Point</p>
+                    <p id="nav-distance" class="text-sm font-medium tracking-wide">-- m</p>
+                </div>
+            </div>
+            <button onclick="confirmStopNavigation()" class="bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-md transition-colors">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+        </div>
+
+        <!-- Floating Action Buttons -->
+        <div class="absolute top-4 left-4 pointer-events-auto">
+            <button onclick="toggleDrawer()" class="bg-white p-3 rounded-xl shadow-lg border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <i data-lucide="menu" class="w-6 h-6 text-gray-700"></i>
+            </button>
+        </div>
+
+        <div class="absolute bottom-6 right-6 flex flex-col space-y-4 pointer-events-auto">
+            <button onclick="centerOnUser()" class="bg-white p-3 rounded-full shadow-lg border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <i data-lucide="crosshair" class="w-6 h-6 text-blue-600"></i>
+            </button>
+            <button onclick="openAddMarkerModal()" class="bg-blue-600 p-4 rounded-full shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                <i data-lucide="plus" class="w-6 h-6 text-white"></i>
+            </button>
+        </div>
+
+        <!-- Banner for "Tap Map" Mode -->
+        <div id="map-pick-banner" class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-full shadow-xl text-sm font-medium pointer-events-auto hidden items-center space-x-3">
+            <i data-lucide="map-pin" class="w-4 h-4"></i>
+            <span>Tap on map to select location</span>
+            <button onclick="cancelMapPick()" class="ml-2 text-gray-300 hover:text-white"><i data-lucide="x-circle" class="w-5 h-5"></i></button>
+        </div>
+
+    </div>
+
+    <!-- Side Drawer -->
+    <div id="drawer" class="absolute top-0 left-0 h-full w-96 max-w-[85vw] bg-white shadow-2xl z-30 drawer-closed transition-transform duration-300 flex flex-col pointer-events-auto">
+        <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+            <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <i data-lucide="map" class="w-6 h-6 text-blue-600"></i>
+                OS Navigator
+            </h1>
+            <button onclick="toggleDrawer()" class="p-2 text-gray-500 hover:text-gray-800 rounded-md">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+        </div>
+
+        <div class="p-4 border-b border-gray-200">
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Base Map</label>
+            <select id="map-layer-select" onchange="changeBaseMap()" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
+                <option value="osm">OpenStreetMap</option>
+                <option value="topo">OpenTopoMap</option>
+                <option value="aerial">Aerial (Esri)</option>
+                <option value="os_combined">OS Maps (Leisure & Road)</option>
+            </select>
+        </div>
+
+        <div class="flex-1 overflow-y-auto no-scrollbar p-4" id="marker-list">
+            <!-- Markers will be injected here -->
+            <div class="text-center text-gray-500 mt-10">No markers added yet.</div>
+        </div>
+        
+        <div class="p-4 border-t border-gray-200 bg-gray-50">
+            <button onclick="openAddMarkerModal()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
+                <i data-lucide="map-pin" class="w-5 h-5"></i> Add New Point
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal Overlay -->
+    <div id="modal-overlay" class="absolute inset-0 bg-black bg-opacity-50 z-40 modal-fade-out transition-opacity duration-300 flex items-center justify-center pointer-events-none px-4">
+        
+        <!-- Add/Edit Marker Modal -->
+        <div id="marker-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-md hidden pointer-events-auto flex-col max-h-[90vh]">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 id="modal-title" class="text-lg font-bold text-gray-800">Add Marker</h3>
+                <button onclick="closeModals()" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            
+            <div class="p-4 overflow-y-auto">
+                <input type="hidden" id="edit-marker-id" value="">
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Name / Label</label>
+                    <input type="text" id="marker-name" placeholder="e.g., Summit, Basecamp" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Input Method</label>
+                    <select id="coord-format" onchange="updateCoordInputs()" class="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50">
+                        <option value="map">Pick on Map</option>
+                        <option value="dd">Decimal Degrees (DD)</option>
+                        <option value="ddm">Degrees, Dec Minutes (DDM)</option>
+                        <option value="dms">Degrees, Min, Sec (DMS)</option>
+                        <option value="os">OS Grid (Easting/Northing)</option>
+                    </select>
+                </div>
+
+                <!-- Dynamic Input Areas -->
+                <div id="input-map" class="text-center p-4 bg-blue-50 rounded-lg border border-blue-100">
+                    <p class="text-sm text-blue-800 mb-3">Click a location on the map to get coordinates.</p>
+                    <button onclick="startMapPick()" class="bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 text-sm font-medium">Select on Map</button>
+                    <p id="picked-coords-display" class="text-xs text-gray-500 mt-2 font-mono hidden"></p>
+                </div>
+
+                <div id="input-dd" class="hidden space-y-3">
+                    <div class="flex gap-2">
+                        <div class="flex-1">
+                            <label class="text-xs text-gray-500 block mb-1">Latitude</label>
+                            <input type="number" id="dd-lat" step="any" placeholder="51.505" class="w-full border border-gray-300 rounded-lg p-2" oninput="syncCoords('dd')">
+                        </div>
+                        <div class="flex-1">
+                            <label class="text-xs text-gray-500 block mb-1">Longitude</label>
+                            <input type="number" id="dd-lng" step="any" placeholder="-0.09" class="w-full border border-gray-300 rounded-lg p-2" oninput="syncCoords('dd')">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="input-ddm" class="hidden space-y-3">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="text-xs text-gray-500 block mb-1">Lat Degrees</label><input type="number" id="ddm-lat-d" class="w-full border rounded-lg p-2" oninput="syncCoords('ddm')"></div>
+                        <div><label class="text-xs text-gray-500 block mb-1">Lat Dec Mins</label><input type="number" id="ddm-lat-m" step="any" class="w-full border rounded-lg p-2" oninput="syncCoords('ddm')"></div>
+                        <div><label class="text-xs text-gray-500 block mb-1">Lng Degrees</label><input type="number" id="ddm-lng-d" class="w-full border rounded-lg p-2" oninput="syncCoords('ddm')"></div>
+                        <div><label class="text-xs text-gray-500 block mb-1">Lng Dec Mins</label><input type="number" id="ddm-lng-m" step="any" class="w-full border rounded-lg p-2" oninput="syncCoords('ddm')"></div>
+                    </div>
+                </div>
+
+                <div id="input-dms" class="hidden space-y-3">
+                     <div class="grid grid-cols-3 gap-2 mb-2">
+                        <div><label class="text-xs text-gray-500 block mb-1">Lat Deg</label><input type="number" id="dms-lat-d" class="w-full border rounded-lg p-2" oninput="syncCoords('dms')"></div>
+                        <div><label class="text-xs text-gray-500 block mb-1">Lat Min</label><input type="number" id="dms-lat-m" class="w-full border rounded-lg p-2" oninput="syncCoords('dms')"></div>
+                        <div><label class="text-xs text-gray-500 block mb-1">Lat Sec</label><input type="number" id="dms-lat-s" step="any" class="w-full border rounded-lg p-2" oninput="syncCoords('dms')"></div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div><label class="text-xs text-gray-500 block mb-1">Lng Deg</label><input type="number" id="dms-lng-d" class="w-full border rounded-lg p-2" oninput="syncCoords('dms')"></div>
+                        <div><label class="text-xs text-gray-500 block mb-1">Lng Min</label><input type="number" id="dms-lng-m" class="w-full border rounded-lg p-2" oninput="syncCoords('dms')"></div>
+                        <div><label class="text-xs text-gray-500 block mb-1">Lng Sec</label><input type="number" id="dms-lng-s" step="any" class="w-full border rounded-lg p-2" oninput="syncCoords('dms')"></div>
+                    </div>
+                </div>
+
+                <div id="input-os" class="hidden space-y-3">
+                     <p class="text-xs text-gray-500 mb-2">Standard OS National Grid Reference.</p>
+                     <div class="flex gap-2">
+                        <div class="flex-1">
+                            <label class="text-xs text-gray-500 block mb-1">Easting (X)</label>
+                            <input type="number" id="os-easting" placeholder="e.g. 400000" class="w-full border border-gray-300 rounded-lg p-2" oninput="syncCoords('os')">
+                        </div>
+                        <div class="flex-1">
+                            <label class="text-xs text-gray-500 block mb-1">Northing (Y)</label>
+                            <input type="number" id="os-northing" placeholder="e.g. 300000" class="w-full border border-gray-300 rounded-lg p-2" oninput="syncCoords('os')">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-gray-200 bg-gray-50 rounded-b-xl flex justify-end space-x-3">
+                <button onclick="closeModals()" class="px-4 py-2 text-gray-600 font-medium hover:bg-gray-200 rounded-lg transition">Cancel</button>
+                <button onclick="saveMarker()" class="px-4 py-2 bg-blue-600 text-white font-medium hover:bg-blue-700 rounded-lg shadow-md transition">Save Marker</button>
+            </div>
+        </div>
+
+        <!-- Custom Confirm Dialog -->
+        <div id="confirm-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col text-center p-6">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                <i data-lucide="alert-triangle" class="h-6 w-6 text-red-600"></i>
+            </div>
+            <h3 id="confirm-title" class="text-lg font-bold text-gray-900 mb-2">Are you sure?</h3>
+            <p id="confirm-message" class="text-sm text-gray-500 mb-6">This action cannot be undone.</p>
+            <div class="flex justify-center gap-3">
+                <button onclick="closeConfirm()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition w-full">Cancel</button>
+                <button id="confirm-action-btn" class="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg font-medium shadow-md transition w-full">Confirm</button>
+            </div>
+        </div>
+
+        <!-- Custom Alert Dialog -->
+        <div id="alert-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col text-center p-6">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4">
+                <i data-lucide="info" class="h-6 w-6 text-blue-600"></i>
+            </div>
+            <h3 id="alert-title" class="text-lg font-bold text-gray-900 mb-2">Information</h3>
+            <p id="alert-message" class="text-sm text-gray-500 mb-6">Message</p>
+            <button onclick="closeModals()" class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-medium shadow-md transition w-full">OK</button>
+        </div>
+
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.19.0/proj4.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4leaflet/1.0.2/proj4leaflet.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/OrdnanceSurvey/os-api-branding@latest/os-api-branding.js"></script>
+    
+    <script>
+        // --- Configuration & State ---
+        const osApiKey = 'VEAc2NZ4i1s6qDeC5D5H6S77PG72TrgW'; // Replace with valid key to use OS maps
+        let map, userPosMarker, navPolyline;
+        let markers = []; // In-memory storage { id, name, lat, lng, isVisible, leafletMarker }
+        let currentEditingId = null;
+        let navigatingToId = null;
+        let userPos = null; // {lat, lng, heading}
+        let watchId = null;
+        let tempPickedCoords = null; // Used during map pick mode
+        let currentMapType = 'osm';
+
+        // Proj4 Definition for OS British National Grid (EPSG:27700)
+        proj4.defs('EPSG:27700', '+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs');
+
+        // Setup base map layers.
+        const osCrs = new L.Proj.CRS('EPSG:27700', '+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs', {
+            resolutions: [ 896.0, 448.0, 224.0, 112.0, 56.0, 28.0, 14.0, 7.0, 3.5, 1.75, 0.875, 0.4375, 0.21875, 0.109375 ],
+            origin: [ -238375.0, 1376256.0 ]
+        });
+
+        const baseMaps = {
+            "osm": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }),
+            "topo": L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '© OpenTopoMap' }),
+            "aerial": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Tiles &copy; Esri' })
+        };
+
+        const osCombinedGroup = L.layerGroup([
+            L.tileLayer(`https://api.os.uk/maps/raster/v1/zxy/Leisure_27700/{z}/{x}/{y}.png?key=${osApiKey}`, { maxZoom: 9 }),
+            L.tileLayer(`https://api.os.uk/maps/raster/v1/zxy/Road_27700/{z}/{x}/{y}.png?key=${osApiKey}`, { minZoom: 10, maxZoom: 13 })
+        ]);
+
+        // --- Initialization ---
+        function initMap() {
+            map = L.map('map', { zoomControl: false, crs: L.CRS.EPSG3857 }).setView([51.505, -0.09], 10);
+            L.control.zoom({ position: 'topright' }).addTo(map);
+            baseMaps["osm"].addTo(map);
+
+            initUserMarker();
+            startTracking();
+            lucide.createIcons();
+        }
+
+        function initUserMarker() {
+            const userIcon = L.divIcon({
+                className: 'custom-user-icon',
+                html: '<div class="user-location-marker w-4 h-4"></div>',
+                iconSize: [16, 16],
+                iconAnchor: [8, 8]
+            });
+            userPosMarker = L.marker([0, 0], { icon: userIcon, zIndexOffset: 1000 });
+            if (userPos) {
+                userPosMarker.setLatLng([userPos.lat, userPos.lng]).addTo(map);
+            }
+        }
+
+        function startTracking() {
+            if ("geolocation" in navigator) {
+                watchId = navigator.geolocation.watchPosition(
+                    (position) => {
+                        userPos = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            heading: position.coords.heading // null if stationary or unavailable
+                        };
+                        updateUserPositionOnMap();
+                        if (navigatingToId) updateNavigation();
+                    },
+                    (error) => console.warn("Geolocation error:", error),
+                    { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+                );
+            } else {
+                showAlert("Error", "Geolocation is not supported by your browser.");
+            }
+        }
+
+        function updateUserPositionOnMap() {
+            if (!userPos) return;
+            const latlng = [userPos.lat, userPos.lng];
+            if (!map.hasLayer(userPosMarker)) {
+                userPosMarker.addTo(map);
+                map.setView(latlng, map.getZoom() || 14); 
+            }
+            userPosMarker.setLatLng(latlng);
+        }
+
+        function centerOnUser() {
+            if (userPos) {
+                map.flyTo([userPos.lat, userPos.lng], currentMapType === 'os_combined' ? 9 : 15);
+            } else {
+                showAlert("Wait", "Still acquiring your location...");
+            }
+        }
+
+        function changeBaseMap() {
+            const selected = document.getElementById('map-layer-select').value;
+            if (selected === currentMapType) return;
+            
+            const isOS = selected === 'os_combined';
+            const wasOS = currentMapType === 'os_combined';
+            
+            currentMapType = selected;
+            
+            if (isOS !== wasOS) {
+                // Hard Map Rebuild required when switching Coordinate Reference Systems (CRS)
+                rebuildMap(isOS);
+            } else {
+                // Soft Switch among standard 3857 maps
+                map.eachLayer(layer => {
+                    if (layer !== userPosMarker && layer !== navPolyline && !markers.some(m => m.leafletMarker === layer)) {
+                        map.removeLayer(layer);
+                    }
+                });
+                baseMaps[selected].addTo(map);
+            }
+        }
+
+        function rebuildMap(useOS) {
+            const center = map.getCenter();
+            const zoom = map.getZoom();
+            
+            // Clean up old map instance
+            map.remove(); 
+            
+            const options = { zoomControl: false, center: center };
+            
+            if (useOS) {
+                options.crs = osCrs;
+                options.minZoom = 0;
+                options.maxZoom = 13;
+                options.zoom = Math.max(0, zoom - 6); // Convert web zoom to OS zoom
+                
+                const transformCoords = function(arr) { return proj4('EPSG:27700', 'EPSG:4326', arr).reverse(); };
+                options.maxBounds = [
+                    transformCoords([ -238375.0, 0.0 ]),
+                    transformCoords([ 900000.0, 1376256.0 ])
+                ];
+            } else {
+                options.crs = L.CRS.EPSG3857;
+                options.zoom = Math.min(19, zoom + 6);
+            }
+            
+            map = L.map('map', options);
+            L.control.zoom({ position: 'topright' }).addTo(map);
+            
+            if (useOS) {
+                osCombinedGroup.addTo(map);
+            } else {
+                baseMaps[currentMapType].addTo(map);
+            }
+            
+            // Reattach markers and layers to the new map instance
+            initUserMarker();
+            markers.forEach(m => {
+                const isVis = m.isVisible;
+                m.leafletMarker = createLeafletMarker(m); // Recreate bounds for new map
+                if (isVis) m.leafletMarker.addTo(map);
+            });
+            
+            if (navigatingToId) {
+                navPolyline = L.polyline([], { color: 'blue', weight: 3, dashArray: '10, 10' }).addTo(map);
+                updateNavigation();
+            }
+            
+            if (!document.getElementById('map-pick-banner').classList.contains('hidden')) {
+                map.once('click', handleMapClick);
+                map.getContainer().style.cursor = 'crosshair';
+            }
+        }
+
+        // --- Drawer UI ---
+        function toggleDrawer() {
+            const drawer = document.getElementById('drawer');
+            if (drawer.classList.contains('drawer-closed')) {
+                drawer.classList.remove('drawer-closed');
+                drawer.classList.add('drawer-open');
+            } else {
+                drawer.classList.remove('drawer-open');
+                drawer.classList.add('drawer-closed');
+            }
+        }
+
+        function renderMarkerList() {
+            const list = document.getElementById('marker-list');
+            list.innerHTML = '';
+            
+            if (markers.length === 0) {
+                list.innerHTML = '<div class="text-center text-gray-500 mt-10">No markers saved.</div>';
+                return;
+            }
+
+            markers.forEach(m => {
+                const isNav = (navigatingToId === m.id);
+                const eyeIcon = m.isVisible ? 'eye' : 'eye-off';
+                const eyeColor = m.isVisible ? 'text-blue-600' : 'text-gray-400';
+                
+                const item = document.createElement('div');
+                item.className = `p-3 mb-2 rounded-lg border ${isNav ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white'} shadow-sm`;
+                
+                item.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-bold text-gray-800 flex items-center gap-2 truncate">
+                            ${isNav ? '<i data-lucide="navigation-2" class="w-4 h-4 text-green-600 shrink-0"></i>' : ''}
+                            ${escapeHTML(m.name)}
+                        </h4>
+                    </div>
+                    <div class="flex space-x-2 bg-gray-50 rounded-lg border border-gray-100 p-1 justify-around">
+                        <button onclick="centerOnMarker('${m.id}')" class="p-2 hover:bg-gray-200 rounded text-gray-700 transition" title="Centre View">
+                            <i data-lucide="crosshair" class="w-5 h-5"></i>
+                        </button>
+                        
+                        ${isNav ? 
+                            `<button onclick="confirmStopNavigation()" class="p-2 hover:bg-red-200 rounded text-red-600 transition" title="Stop Navigating">
+                                <i data-lucide="square" class="w-5 h-5 fill-current"></i>
+                            </button>` :
+                            `<button onclick="startNavigation('${m.id}')" class="p-2 hover:bg-blue-200 rounded text-blue-600 transition" title="Navigate">
+                                <i data-lucide="navigation" class="w-5 h-5"></i>
+                            </button>`
+                        }
+
+                        <button onclick="editMarker('${m.id}')" class="p-2 hover:bg-gray-200 rounded text-blue-600 transition" title="Edit">
+                            <i data-lucide="edit-2" class="w-5 h-5"></i>
+                        </button>
+                        
+                        <button onclick="toggleMarkerVisibility('${m.id}')" class="p-2 hover:bg-gray-200 rounded transition" ${isNav ? 'disabled title="Cannot hide while navigating"' : 'title="Toggle Visibility"'}>
+                            <i data-lucide="${eyeIcon}" class="w-5 h-5 ${isNav ? 'text-gray-300' : eyeColor}"></i>
+                        </button>
+                        
+                        <button onclick="confirmDeleteMarker('${m.id}')" class="p-2 hover:bg-gray-200 rounded text-red-600 transition" ${isNav ? 'disabled title="Cannot delete active target"' : 'title="Delete"'}>
+                            <i data-lucide="trash-2" class="w-5 h-5 ${isNav ? 'text-gray-300' : ''}"></i>
+                        </button>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+            lucide.createIcons();
+        }
+
+        // --- Marker Logic ---
+        function toggleMarkerVisibility(id) {
+            if (navigatingToId === id) return; // Cannot hide active target
+            const m = markers.find(x => x.id === id);
+            if (!m) return;
+            m.isVisible = !m.isVisible;
+            if (m.isVisible) {
+                m.leafletMarker.addTo(map);
+            } else {
+                map.removeLayer(m.leafletMarker);
+            }
+            renderMarkerList();
+        }
+
+        function centerOnMarker(id) {
+            const m = markers.find(x => x.id === id);
+            if (m) {
+                if(!m.isVisible) toggleMarkerVisibility(m.id);
+                map.flyTo([m.lat, m.lng], 15);
+                if(window.innerWidth < 768) toggleDrawer(); // Close drawer on mobile
+            }
+        }
+
+        function deleteMarker(id) {
+            const idx = markers.findIndex(x => x.id === id);
+            if (idx > -1) {
+                map.removeLayer(markers[idx].leafletMarker);
+                markers.splice(idx, 1);
+                renderMarkerList();
+                closeConfirm();
+            }
+        }
+
+        function getPopupContent(m) {
+            return `
+                <div class="text-center min-w-[100px] p-1">
+                    <b class="block mb-3 text-sm text-gray-800">${escapeHTML(m.name)}</b>
+                    <div class="flex gap-2 justify-center">
+                        <button onclick="editMarker('${m.id}'); map.closePopup();" class="flex-1 flex justify-center items-center bg-blue-100 text-blue-700 p-2 rounded hover:bg-blue-200 transition-colors" title="Edit">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                        </button>
+                        <button onclick="startNavigation('${m.id}'); map.closePopup();" class="flex-1 flex justify-center items-center bg-green-100 text-green-700 p-2 rounded hover:bg-green-200 transition-colors" title="Navigate">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function createLeafletMarker(m) {
+            const icon = L.divIcon({
+                html: `<div class="bg-red-500 rounded-full w-4 h-4 border-2 border-white shadow-md"></div>`,
+                className: 'custom-poi', iconSize: [16,16], iconAnchor: [8,8]
+            });
+            const lm = L.marker([m.lat, m.lng], { icon: icon }).bindPopup(getPopupContent(m));
+            if (m.isVisible) lm.addTo(map);
+            return lm;
+        }
+
+        // --- Add / Edit Modals & Input ---
+        function openAddMarkerModal() {
+            currentEditingId = null;
+            tempPickedCoords = null;
+            document.getElementById('edit-marker-id').value = '';
+            document.getElementById('marker-name').value = '';
+            document.getElementById('modal-title').innerText = 'Add New Marker';
+            document.getElementById('coord-format').value = 'map';
+            document.getElementById('picked-coords-display').classList.add('hidden');
+            updateCoordInputs();
+            showModal('marker-modal');
+            if(!document.getElementById('drawer').classList.contains('drawer-closed')) toggleDrawer();
+        }
+
+        function editMarker(id) {
+            const m = markers.find(x => x.id === id);
+            if (!m) return;
+            currentEditingId = id;
+            tempPickedCoords = { lat: m.lat, lng: m.lng };
+            
+            document.getElementById('edit-marker-id').value = id;
+            document.getElementById('marker-name').value = m.name;
+            document.getElementById('modal-title').innerText = 'Edit Marker';
+            
+            // Set input format to DD and populate
+            document.getElementById('coord-format').value = 'dd';
+            document.getElementById('dd-lat').value = m.lat.toFixed(6);
+            document.getElementById('dd-lng').value = m.lng.toFixed(6);
+            
+            syncCoords('dd');
+            updateCoordInputs();
+            showModal('marker-modal');
+        }
+
+        function updateCoordInputs() {
+            const format = document.getElementById('coord-format').value;
+            ['map', 'dd', 'ddm', 'dms', 'os'].forEach(id => {
+                document.getElementById(`input-${id}`).classList.add('hidden');
+            });
+            document.getElementById(`input-${format}`).classList.remove('hidden');
+        }
+
+        function startMapPick() {
+            closeModals();
+            document.getElementById('map-pick-banner').classList.remove('hidden');
+            map.getContainer().style.cursor = 'crosshair';
+            map.once('click', handleMapClick);
+        }
+
+        function cancelMapPick() {
+            document.getElementById('map-pick-banner').classList.add('hidden');
+            map.getContainer().style.cursor = '';
+            map.off('click', handleMapClick);
+            showModal('marker-modal');
+        }
+
+        function handleMapClick(e) {
+            tempPickedCoords = e.latlng;
+            document.getElementById('map-pick-banner').classList.add('hidden');
+            map.getContainer().style.cursor = '';
+            
+            const display = document.getElementById('picked-coords-display');
+            display.innerText = `Selected: ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
+            display.classList.remove('hidden');
+            
+            // Populate coordinate inputs
+            document.getElementById('dd-lat').value = e.latlng.lat.toFixed(6);
+            document.getElementById('dd-lng').value = e.latlng.lng.toFixed(6);
+            syncCoords('dd');
+            
+            showModal('marker-modal');
+        }
+
+        function syncCoords(source) {
+            let lat, lng;
+            try {
+                if (source === 'dd') {
+                    lat = parseFloat(document.getElementById('dd-lat').value);
+                    lng = parseFloat(document.getElementById('dd-lng').value);
+                } else if (source === 'ddm') {
+                    const latD = parseFloat(document.getElementById('ddm-lat-d').value || 0);
+                    const latM = parseFloat(document.getElementById('ddm-lat-m').value || 0);
+                    const lngD = parseFloat(document.getElementById('ddm-lng-d').value || 0);
+                    const lngM = parseFloat(document.getElementById('ddm-lng-m').value || 0);
+                    lat = latD + (latM / 60) * (latD < 0 ? -1 : 1);
+                    lng = lngD + (lngM / 60) * (lngD < 0 ? -1 : 1);
+                } else if (source === 'dms') {
+                    const latD = parseFloat(document.getElementById('dms-lat-d').value || 0);
+                    const latM = parseFloat(document.getElementById('dms-lat-m').value || 0);
+                    const latS = parseFloat(document.getElementById('dms-lat-s').value || 0);
+                    const lngD = parseFloat(document.getElementById('dms-lng-d').value || 0);
+                    const lngM = parseFloat(document.getElementById('dms-lng-m').value || 0);
+                    const lngS = parseFloat(document.getElementById('dms-lng-s').value || 0);
+                    lat = latD + (latM / 60) + (latS / 3600) * (latD < 0 ? -1 : 1);
+                    lng = lngD + (lngM / 60) + (lngS / 3600) * (lngD < 0 ? -1 : 1);
+                } else if (source === 'os') {
+                    const e = parseFloat(document.getElementById('os-easting').value);
+                    const n = parseFloat(document.getElementById('os-northing').value);
+                    if (isNaN(e) || isNaN(n)) return; 
+                    const converted = proj4('EPSG:27700', 'EPSG:4326', [e, n]);
+                    lng = converted[0];
+                    lat = converted[1];
+                }
+
+                if (isNaN(lat) || isNaN(lng)) return;
+
+                // Sync DD
+                if (source !== 'dd') {
+                    document.getElementById('dd-lat').value = lat.toFixed(6);
+                    document.getElementById('dd-lng').value = lng.toFixed(6);
+                }
+                // Sync DDM
+                if (source !== 'ddm') {
+                    const absLat = Math.abs(lat);
+                    document.getElementById('ddm-lat-d').value = Math.floor(absLat) * (lat < 0 ? -1 : 1);
+                    document.getElementById('ddm-lat-m').value = ((absLat - Math.floor(absLat)) * 60).toFixed(4);
+                    
+                    const absLng = Math.abs(lng);
+                    document.getElementById('ddm-lng-d').value = Math.floor(absLng) * (lng < 0 ? -1 : 1);
+                    document.getElementById('ddm-lng-m').value = ((absLng - Math.floor(absLng)) * 60).toFixed(4);
+                }
+                // Sync DMS
+                if (source !== 'dms') {
+                    const absLat = Math.abs(lat);
+                    const latD = Math.floor(absLat);
+                    const latMFloat = (absLat - latD) * 60;
+                    const latM = Math.floor(latMFloat);
+                    const latS = (latMFloat - latM) * 60;
+                    document.getElementById('dms-lat-d').value = latD * (lat < 0 ? -1 : 1);
+                    document.getElementById('dms-lat-m').value = latM;
+                    document.getElementById('dms-lat-s').value = latS.toFixed(2);
+
+                    const absLng = Math.abs(lng);
+                    const lngD = Math.floor(absLng);
+                    const lngMFloat = (absLng - lngD) * 60;
+                    const lngM = Math.floor(lngMFloat);
+                    const lngS = (lngMFloat - lngM) * 60;
+                    document.getElementById('dms-lng-d').value = lngD * (lng < 0 ? -1 : 1);
+                    document.getElementById('dms-lng-m').value = lngM;
+                    document.getElementById('dms-lng-s').value = lngS.toFixed(2);
+                }
+                // Sync OS
+                if (source !== 'os') {
+                    const osCoords = proj4('EPSG:4326', 'EPSG:27700', [lng, lat]);
+                    document.getElementById('os-easting').value = osCoords[0].toFixed(2);
+                    document.getElementById('os-northing').value = osCoords[1].toFixed(2);
+                }
+            } catch (err) {
+                // Silently handle incomplete typing
+            }
+        }
+
+        function saveMarker() {
+            const name = document.getElementById('marker-name').value.trim() || 'Untitled Point';
+            const format = document.getElementById('coord-format').value;
+            let lat, lng;
+
+            try {
+                if (format === 'map') {
+                    if (!tempPickedCoords) throw new Error("Please select a location on the map.");
+                    lat = tempPickedCoords.lat; lng = tempPickedCoords.lng;
+                } else if (format === 'dd') {
+                    lat = parseFloat(document.getElementById('dd-lat').value);
+                    lng = parseFloat(document.getElementById('dd-lng').value);
+                    if (isNaN(lat) || isNaN(lng)) throw new Error("Invalid Decimal Degrees.");
+                } else if (format === 'ddm') {
+                    const latD = parseFloat(document.getElementById('ddm-lat-d').value || 0);
+                    const latM = parseFloat(document.getElementById('ddm-lat-m').value || 0);
+                    const lngD = parseFloat(document.getElementById('ddm-lng-d').value || 0);
+                    const lngM = parseFloat(document.getElementById('ddm-lng-m').value || 0);
+                    lat = latD + (latM / 60) * (latD < 0 ? -1 : 1);
+                    lng = lngD + (lngM / 60) * (lngD < 0 ? -1 : 1);
+                } else if (format === 'dms') {
+                    const latD = parseFloat(document.getElementById('dms-lat-d').value || 0);
+                    const latM = parseFloat(document.getElementById('dms-lat-m').value || 0);
+                    const latS = parseFloat(document.getElementById('dms-lat-s').value || 0);
+                    const lngD = parseFloat(document.getElementById('dms-lng-d').value || 0);
+                    const lngM = parseFloat(document.getElementById('dms-lng-m').value || 0);
+                    const lngS = parseFloat(document.getElementById('dms-lng-s').value || 0);
+                    lat = latD + (latM / 60) + (latS / 3600) * (latD < 0 ? -1 : 1);
+                    lng = lngD + (lngM / 60) + (lngS / 3600) * (lngD < 0 ? -1 : 1);
+                } else if (format === 'os') {
+                    const e = parseFloat(document.getElementById('os-easting').value);
+                    const n = parseFloat(document.getElementById('os-northing').value);
+                    if (isNaN(e) || isNaN(n)) throw new Error("Invalid OS Grid coordinates.");
+                    // Convert OSGB36 (EPSG:27700) to WGS84 (EPSG:4326)
+                    const converted = proj4('EPSG:27700', 'EPSG:4326', [e, n]);
+                    lng = converted[0];
+                    lat = converted[1];
+                }
+
+                if (lat < -90 || lat > 90 || lng < -180 || lng > 180 || isNaN(lat) || isNaN(lng)) {
+                    throw new Error("Calculated coordinates are out of valid bounds.");
+                }
+            } catch (err) {
+                showAlert("Input Error", err.message);
+                return;
+            }
+
+            if (currentEditingId) {
+                const m = markers.find(x => x.id === currentEditingId);
+                m.name = name; m.lat = lat; m.lng = lng;
+                m.leafletMarker.setLatLng([lat, lng]);
+                m.leafletMarker.setPopupContent(getPopupContent(m));
+                if (navigatingToId === m.id) updateNavigation();
+            } else {
+                const newM = {
+                    id: 'm_' + Date.now(),
+                    name: name,
+                    lat: lat, lng: lng,
+                    isVisible: true
+                };
+                newM.leafletMarker = createLeafletMarker(newM);
+                markers.push(newM);
+            }
+
+            closeModals();
+            renderMarkerList();
+        }
+
+        // --- Navigation Logic ---
+        function startNavigation(id) {
+            const m = markers.find(x => x.id === id);
+            if (!m) return;
+            
+            if (!userPos) {
+                showAlert("Location Required", "Waiting for GPS location to start navigation.");
+                return;
+            }
+
+            navigatingToId = id;
+            if (!m.isVisible) toggleMarkerVisibility(id); // Force visible
+
+            document.getElementById('nav-target-name').innerText = escapeHTML(m.name);
+            document.getElementById('nav-bar').classList.remove('-translate-y-full');
+            
+            if (window.innerWidth < 768) toggleDrawer();
+
+            if (!navPolyline) {
+                navPolyline = L.polyline([], { color: 'blue', weight: 3, dashArray: '10, 10' }).addTo(map);
+            }
+
+            updateNavigation();
+            
+            // Adjust bounds to see both
+            const bounds = L.latLngBounds([userPos.lat, userPos.lng], [m.lat, m.lng]);
+            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+            renderMarkerList();
+        }
+
+        function updateNavigation() {
+            if (!navigatingToId || !userPos) return;
+            const target = markers.find(x => x.id === navigatingToId);
+            if (!target) return;
+
+            // Draw Line
+            navPolyline.setLatLngs([[userPos.lat, userPos.lng], [target.lat, target.lng]]);
+
+            // Distance
+            const distMeters = map.distance([userPos.lat, userPos.lng], [target.lat, target.lng]);
+            const distText = distMeters > 1000 ? (distMeters / 1000).toFixed(2) + ' km' : Math.round(distMeters) + ' m';
+            document.getElementById('nav-distance').innerText = distText;
+
+            // Bearing
+            const bearing = calculateBearing(userPos.lat, userPos.lng, target.lat, target.lng);
+            const compContainer = document.getElementById('nav-compass-container');
+            
+            // If device heading is available, calculate relative. Otherwise, absolute bearing.
+            let rotateAngle = bearing;
+            if (userPos.heading !== null && !isNaN(userPos.heading)) {
+                rotateAngle = bearing - userPos.heading;
+            }
+            compContainer.style.transform = `rotate(${rotateAngle}deg)`;
+        }
+
+        function stopNavigation() {
+            navigatingToId = null;
+            document.getElementById('nav-bar').classList.add('-translate-y-full');
+            if (navPolyline) {
+                map.removeLayer(navPolyline);
+                navPolyline = null;
+            }
+            closeConfirm();
+            renderMarkerList();
+        }
+
+        function calculateBearing(lat1, lon1, lat2, lon2) {
+            const toRad = deg => deg * Math.PI / 180;
+            const toDeg = rad => rad * 180 / Math.PI;
+            
+            const dLon = toRad(lon2 - lon1);
+            lat1 = toRad(lat1); lat2 = toRad(lat2);
+            
+            const y = Math.sin(dLon) * Math.cos(lat2);
+            const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+            return (toDeg(Math.atan2(y, x)) + 360) % 360;
+        }
+
+        // --- Custom Modals & Utilities ---
+        function showModal(id) {
+            document.getElementById('modal-overlay').classList.remove('modal-fade-out');
+            document.getElementById('modal-overlay').classList.add('modal-fade-in');
+            ['marker-modal', 'confirm-modal', 'alert-modal'].forEach(m => document.getElementById(m).classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModals() {
+            document.getElementById('modal-overlay').classList.remove('modal-fade-in');
+            document.getElementById('modal-overlay').classList.add('modal-fade-out');
+            setTimeout(() => {
+                ['marker-modal', 'confirm-modal', 'alert-modal'].forEach(m => document.getElementById(m).classList.add('hidden'));
+            }, 300);
+        }
+
+        function showAlert(title, message) {
+            document.getElementById('alert-title').innerText = title;
+            document.getElementById('alert-message').innerText = message;
+            showModal('alert-modal');
+        }
+
+        function confirmDeleteMarker(id) {
+            document.getElementById('confirm-title').innerText = "Delete Marker?";
+            document.getElementById('confirm-message').innerText = "Are you sure you want to remove this marker permanently?";
+            document.getElementById('confirm-action-btn').onclick = () => deleteMarker(id);
+            showModal('confirm-modal');
+        }
+
+        function confirmStopNavigation() {
+            document.getElementById('confirm-title').innerText = "Stop Navigating?";
+            document.getElementById('confirm-message').innerText = "Are you sure you want to cancel the current route?";
+            document.getElementById('confirm-action-btn').onclick = stopNavigation;
+            showModal('confirm-modal');
+        }
+
+        function closeConfirm() {
+            closeModals();
+        }
+
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
+        }
+
+        // Boot
+        window.onload = initMap;
+
+    </script>
+</body>
+</html>
