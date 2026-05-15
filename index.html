@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -61,9 +62,9 @@
     <div id="ui-layer" class="flex flex-col justify-between">
         
         <!-- Top Navigation Bar (Hidden by default) -->
-        <div id="nav-bar" class="bg-blue-600 text-white shadow-lg p-4 flex items-center justify-between transform -translate-y-full transition-transform duration-300 pointer-events-auto">
+        <div id="nav-bar" class="bg-gray-700 text-white shadow-lg p-4 flex items-center justify-between transform -translate-y-full transition-transform duration-300 pointer-events-auto">
             <div class="flex items-center space-x-4">
-                <div class="bg-blue-800 p-2 rounded-full transform transition-transform" id="nav-compass-container">
+                <div class="bg-gray-900 p-2 rounded-full transform transition-transform" id="nav-compass-container">
                     <i data-lucide="navigation" id="nav-compass" class="w-6 h-6"></i>
                 </div>
                 <div>
@@ -78,7 +79,7 @@
         </div>
 
         <!-- Floating Action Buttons -->
-        <div class="absolute top-4 left-4 pointer-events-auto">
+        <div class="absolute bottom-6 left-6 pointer-events-auto">
             <button onclick="toggleDrawer()" class="bg-white p-3 rounded-xl shadow-lg border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <i data-lucide="menu" class="w-6 h-6 text-gray-700"></i>
             </button>
@@ -461,13 +462,17 @@
                 item.className = `p-3 mb-2 rounded-lg border ${isNav ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white'} shadow-sm`;
                 
                 item.innerHTML = `
-                    <div class="flex justify-between items-center mb-2">
-                        <h4 class="font-bold text-gray-800 flex items-center gap-2 truncate">
+                    <div class="flex items-center justify-between gap-2">
+
+                        <div class="flex items-center gap-2 min-w-0">
                             ${isNav ? '<i data-lucide="navigation-2" class="w-4 h-4 text-green-600 shrink-0"></i>' : ''}
-                            ${escapeHTML(m.name)}
-                        </h4>
-                    </div>
-                    <div class="flex space-x-2 bg-gray-50 rounded-lg border border-gray-100 p-1 justify-around">
+
+                            <h4 class="font-bold text-gray-800 truncate">
+                                ${escapeHTML(m.name)}
+                            </h4>
+                        </div>
+
+                        <div class="flex items-center space-x-1 bg-gray-50 rounded-lg border border-gray-100 p-1 shrink-0">
                         <button onclick="centerOnMarker('${m.id}')" class="p-2 hover:bg-gray-200 rounded text-gray-700 transition" title="Centre View">
                             <i data-lucide="crosshair" class="w-5 h-5"></i>
                         </button>
@@ -493,7 +498,8 @@
                             <i data-lucide="trash-2" class="w-5 h-5 ${isNav ? 'text-gray-300' : ''}"></i>
                         </button>
                     </div>
-                `;
+                </div>
+            `;
                 list.appendChild(item);
             });
             lucide.createIcons();
@@ -517,7 +523,12 @@
             const m = markers.find(x => x.id === id);
             if (m) {
                 if(!m.isVisible) toggleMarkerVisibility(m.id);
-                map.flyTo([m.lat, m.lng], 15);
+
+                // OS maps use a different CRS + zoom range
+                const targetZoom = currentMapType === 'os_combined' ? 9 : 15;
+
+                map.flyTo([m.lat, m.lng], targetZoom);
+
                 if(window.innerWidth < 768) toggleDrawer(); // Close drawer on mobile
             }
         }
