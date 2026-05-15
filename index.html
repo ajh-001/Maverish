@@ -63,32 +63,34 @@
         <!-- Top Navigation Bar (Hidden by default) -->
         <div id="nav-bar" class="bg-gray-700 text-white shadow-lg p-4 flex items-center justify-between transform -translate-y-full transition-transform duration-300 pointer-events-auto">
             <div class="flex items-center space-x-4">
-                <div class="bg-gray-900 p-2 rounded-full transform transition-transform" id="nav-compass-container">
-                    <i data-lucide="navigation" id="nav-compass" class="w-6 h-6"></i>
-                </div>
+                <button onclick="openCompassModal()" class="bg-gray-900 w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors cursor-pointer shrink-0">
+                    <div id="nav-compass-container" class="transition-transform duration-200 ease-out w-6 h-6">
+                        <i data-lucide="navigation" class="w-full h-full text-blue-400 fill-current"></i>
+                    </div>
+                </button>
                 <div>
                     <h2 class="text-sm font-semibold opacity-80">Navigating to</h2>
                     <p id="nav-target-name" class="text-lg font-bold">Target Point</p>
                     <p id="nav-distance" class="text-sm font-medium tracking-wide">-- m</p>
                 </div>
             </div>
-            <button onclick="confirmStopNavigation()" class="bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-md transition-colors">
+            <button onclick="confirmStopNavigation()" class="bg-red-500 hover:bg-red-600 text-white w-10 h-10 flex items-center justify-center rounded-full shadow-md transition-colors shrink-0">
                 <i data-lucide="x" class="w-6 h-6"></i>
             </button>
         </div>
 
         <!-- Floating Action Buttons -->
         <div class="absolute bottom-6 left-6 pointer-events-auto">
-            <button onclick="toggleDrawer()" class="bg-white p-3 rounded-xl shadow-lg border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button onclick="toggleDrawer()" class="bg-white w-14 h-14 flex items-center justify-center rounded-xl shadow-lg border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <i data-lucide="menu" class="w-6 h-6 text-gray-700"></i>
             </button>
         </div>
 
         <div class="absolute bottom-6 right-6 flex flex-col space-y-4 pointer-events-auto">
-            <button id="center-btn" onclick="centerOnUser()" class="bg-white p-3 rounded-full shadow-lg border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+            <button id="center-btn" onclick="centerOnUser()" class="bg-white w-14 h-14 flex items-center justify-center rounded-full shadow-lg border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
                 <i data-lucide="crosshair" class="w-6 h-6 text-blue-600 transition-colors"></i>
             </button>
-            <button onclick="openAddMarkerModal()" class="bg-blue-600 p-4 rounded-full shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+            <button onclick="openAddMarkerModal()" class="bg-blue-600 w-14 h-14 flex items-center justify-center rounded-full shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
                 <i data-lucide="plus" class="w-6 h-6 text-white"></i>
             </button>
         </div>
@@ -256,6 +258,31 @@
             <button onclick="closeModals()" class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-medium shadow-md transition w-full">OK</button>
         </div>
 
+        <!-- Large Compass Modal -->
+        <div id="compass-modal" class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col items-center justify-center p-8 border border-gray-700">
+            <h3 class="text-xl font-bold text-gray-100 mb-6 flex items-center gap-2">
+                <i data-lucide="navigation-2" class="w-5 h-5 text-blue-400"></i>
+                Navigation Heading
+            </h3>
+            
+            <div class="relative w-56 h-56 rounded-full border-4 border-gray-700 flex items-center justify-center mb-8 shadow-[inset_0_0_20px_rgba(0,0,0,0.5),0_0_30px_rgba(0,0,0,0.3)] bg-gray-900">
+                <!-- Compass marks -->
+                <div class="absolute top-3 text-red-500 font-bold text-lg leading-none">N</div>
+                <div class="absolute right-3 text-gray-500 font-bold text-lg leading-none">E</div>
+                <div class="absolute bottom-3 text-gray-500 font-bold text-lg leading-none">S</div>
+                <div class="absolute left-3 text-gray-500 font-bold text-lg leading-none">W</div>
+                
+                <!-- Inner Ring -->
+                <div class="absolute w-40 h-40 rounded-full border border-gray-800 pointer-events-none"></div>
+
+                <div id="large-compass-container" class="transition-transform duration-200 ease-out w-28 h-28 text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)]">
+                    <i data-lucide="navigation" class="w-full h-full fill-current"></i>
+                </div>
+            </div>
+            
+            <button onclick="closeModals()" class="px-6 py-3 bg-gray-700 text-white hover:bg-gray-600 rounded-xl font-medium shadow-md transition w-full">Close</button>
+        </div>
+
     </div>
 
     <!-- Scripts -->
@@ -279,6 +306,7 @@
         let deviceHeading = null;
         let navTargetBearing = null;
         let orientationRequested = false;
+        let currentNavRotation = 0; // Tracks rotation dynamically to prevent snapping
 
         // Proj4 Definition for OS British National Grid (EPSG:27700)
         proj4.defs('EPSG:27700', '+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs');
@@ -337,6 +365,34 @@
             // Request orientation permission on first tap (Required for iOS 13+)
             window.addEventListener('click', requestOrientationPermission, { once: true });
             window.addEventListener('touchstart', requestOrientationPermission, { once: true });
+
+            loadMarkersFromStorage();
+        }
+
+        // --- Persistence ---
+        function saveMarkersToStorage() {
+            // Strip leafletMarker instances to prevent circular JSON errors
+            const dataToSave = markers.map(m => ({
+                id: m.id, name: m.name, lat: m.lat, lng: m.lng, isVisible: m.isVisible
+            }));
+            localStorage.setItem('maverish_markers', JSON.stringify(dataToSave));
+        }
+
+        function loadMarkersFromStorage() {
+            const savedData = localStorage.getItem('maverish_markers');
+            if (savedData) {
+                try {
+                    const parsedMarkers = JSON.parse(savedData);
+                    parsedMarkers.forEach(m => {
+                        const newM = { ...m };
+                        newM.leafletMarker = createLeafletMarker(newM);
+                        markers.push(newM);
+                    });
+                    renderMarkerList();
+                } catch (e) {
+                    console.error("Failed to load markers from storage", e);
+                }
+            }
         }
 
         function setupMapListeners() {
@@ -652,6 +708,7 @@
             } else {
                 map.removeLayer(m.leafletMarker);
             }
+            saveMarkersToStorage(); // Save State
             renderMarkerList();
         }
 
@@ -665,7 +722,7 @@
 
                 map.flyTo([m.lat, m.lng], targetZoom);
 
-                if(window.innerWidth < 768) toggleDrawer(); // Close drawer on mobile
+                if(window.innerWidth < 768) closeDrawerIfOpen(); // Close drawer on mobile
             }
         }
 
@@ -674,6 +731,7 @@
             if (idx > -1) {
                 map.removeLayer(markers[idx].leafletMarker);
                 markers.splice(idx, 1);
+                saveMarkersToStorage(); // Save State
                 renderMarkerList();
                 closeConfirm();
             }
@@ -732,7 +790,7 @@
             
             // Show Delete on Edit Mode
             document.getElementById('modal-delete-btn').classList.remove('hidden');
-            document.getElementById('modal-delete-btn').onclick = () => { confirmDeleteMarker(id); }; // Fixed: removed closeModals() here
+            document.getElementById('modal-delete-btn').onclick = () => { confirmDeleteMarker(id); };
             
             // Set input format to DD and populate
             document.getElementById('coord-format').value = 'dd';
@@ -926,6 +984,7 @@
                 markers.push(newM);
             }
 
+            saveMarkersToStorage(); // Save State
             closeModals();
             renderMarkerList();
         }
@@ -946,7 +1005,11 @@
             document.getElementById('nav-target-name').innerText = escapeHTML(m.name);
             document.getElementById('nav-bar').classList.remove('-translate-y-full');
             
-            if (window.innerWidth < 768) toggleDrawer();
+            // Only close drawer if it's currently open
+            const drawer = document.getElementById('drawer');
+            if (window.innerWidth < 768 && !drawer.classList.contains('drawer-closed')) {
+                toggleDrawer();
+            }
 
             if (!navPolyline) {
                 navPolyline = L.polyline([], { color: 'blue', weight: 3, dashArray: '10, 10' }).addTo(map);
@@ -981,15 +1044,25 @@
         function updateNavigationCompass() {
             if (navTargetBearing === null) return;
             const compContainer = document.getElementById('nav-compass-container');
+            const largeCompContainer = document.getElementById('large-compass-container');
             
-            let rotateAngle = navTargetBearing;
+            let targetRotation = navTargetBearing;
+            
             if (deviceHeading !== null && !isNaN(deviceHeading)) {
-                rotateAngle = navTargetBearing - deviceHeading;
+                targetRotation = navTargetBearing - deviceHeading;
             } else if (userPos && userPos.heading !== null && !isNaN(userPos.heading)) {
-                rotateAngle = navTargetBearing - userPos.heading;
+                targetRotation = navTargetBearing - userPos.heading;
             }
             
-            compContainer.style.transform = `rotate(${rotateAngle}deg)`;
+            // Calculate shortest path for rotation to stop CSS spinning around 360 backwards
+            let delta = targetRotation - (currentNavRotation % 360);
+            if (delta > 180) delta -= 360;
+            if (delta < -180) delta += 360;
+            
+            currentNavRotation += delta;
+            
+            compContainer.style.transform = `rotate(${currentNavRotation}deg)`;
+            if (largeCompContainer) largeCompContainer.style.transform = `rotate(${currentNavRotation}deg)`;
         }
 
         function stopNavigation() {
@@ -1022,7 +1095,7 @@
             if (closeModalsTimeout) clearTimeout(closeModalsTimeout);
             document.getElementById('modal-overlay').classList.remove('modal-fade-out');
             document.getElementById('modal-overlay').classList.add('modal-fade-in');
-            ['marker-modal', 'confirm-modal', 'alert-modal'].forEach(m => document.getElementById(m).classList.add('hidden'));
+            ['marker-modal', 'confirm-modal', 'alert-modal', 'compass-modal'].forEach(m => document.getElementById(m).classList.add('hidden'));
             document.getElementById(id).classList.remove('hidden');
         }
 
@@ -1030,8 +1103,12 @@
             document.getElementById('modal-overlay').classList.remove('modal-fade-in');
             document.getElementById('modal-overlay').classList.add('modal-fade-out');
             closeModalsTimeout = setTimeout(() => {
-                ['marker-modal', 'confirm-modal', 'alert-modal'].forEach(m => document.getElementById(m).classList.add('hidden'));
+                ['marker-modal', 'confirm-modal', 'alert-modal', 'compass-modal'].forEach(m => document.getElementById(m).classList.add('hidden'));
             }, 300);
+        }
+
+        function openCompassModal() {
+            showModal('compass-modal');
         }
 
         function showAlert(title, message) {
