@@ -1,7 +1,8 @@
 {
   "name": "Maverish Navigation",
   "short_name": "Maverish",
-  "start_url": "./maverish.html",
+  "start_url": "/maverish/",
+  "scope": "/maverish/",
   "display": "standalone",
   "background_color": "#f3f4f6",
   "theme_color": "#1f2937",
