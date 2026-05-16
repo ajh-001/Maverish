@@ -6,7 +6,7 @@
     <title>Maverish</title>
     
     <!-- PWA Meta Tags -->
-    <link rel="manifest" href="/maverish/manifest.json" />
+    <link rel="manifest" href="/Maverish/manifest.json" />
     <meta name="theme-color" content="#1f2937" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -1302,8 +1302,8 @@
             
             // Register Service Worker for PWA
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/maverish/sw.js', {
-                    scope: '/maverish/'
+                navigator.serviceWorker.register('/Maverish/sw.js', {
+                    scope: '/Maverish/'
                 })
                     .then(registration => console.log('ServiceWorker registration successful'))
                     .catch(err => console.log('ServiceWorker registration failed: ', err));
