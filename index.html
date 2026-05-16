@@ -64,8 +64,10 @@
         <div id="nav-bar" class="bg-gray-700 text-white shadow-lg p-4 flex items-center justify-between transform -translate-y-full transition-transform duration-300 pointer-events-auto">
             <div class="flex items-center space-x-4">
                 <button onclick="openCompassModal()" class="bg-gray-900 w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors cursor-pointer shrink-0">
-                    <div id="nav-compass-container" class="transition-transform duration-200 ease-out w-6 h-6">
-                        <i data-lucide="navigation" class="w-full h-full text-blue-400 fill-current"></i>
+                    <div id="nav-compass-container" class="transition-transform duration-200 ease-out w-6 h-6 text-blue-400">
+                        <svg viewBox="0 0 24 24" class="w-full h-full fill-current drop-shadow-sm" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="12 2 19 21 12 17 5 21 12 2" />
+                        </svg>
                     </div>
                 </button>
                 <div>
@@ -259,25 +261,33 @@
         </div>
 
         <!-- Large Compass Modal -->
-        <div id="compass-modal" class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col items-center justify-center p-8 border border-gray-700">
-            <h3 class="text-xl font-bold text-gray-100 mb-6 flex items-center gap-2">
+        <div id="compass-modal" class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col items-center justify-center p-8 border border-gray-700 text-center">
+            <h3 class="text-xl font-bold text-gray-100 mb-6 flex items-center justify-center gap-2 w-full">
                 <i data-lucide="navigation-2" class="w-5 h-5 text-blue-400"></i>
                 Navigation Heading
             </h3>
             
-            <div class="relative w-56 h-56 rounded-full border-4 border-gray-700 flex items-center justify-center mb-8 shadow-[inset_0_0_20px_rgba(0,0,0,0.5),0_0_30px_rgba(0,0,0,0.3)] bg-gray-900">
-                <!-- Compass marks -->
-                <div class="absolute top-3 text-red-500 font-bold text-lg leading-none">N</div>
-                <div class="absolute right-3 text-gray-500 font-bold text-lg leading-none">E</div>
-                <div class="absolute bottom-3 text-gray-500 font-bold text-lg leading-none">S</div>
-                <div class="absolute left-3 text-gray-500 font-bold text-lg leading-none">W</div>
-                
-                <!-- Inner Ring -->
-                <div class="absolute w-40 h-40 rounded-full border border-gray-800 pointer-events-none"></div>
-
-                <div id="large-compass-container" class="transition-transform duration-200 ease-out w-28 h-28 text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)]">
-                    <i data-lucide="navigation" class="w-full h-full fill-current"></i>
+            <div class="relative w-56 h-56 rounded-full border-4 border-gray-700 flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,0.5),0_0_30px_rgba(0,0,0,0.3)] bg-gray-900 shrink-0 overflow-hidden">
+                <!-- Rotating Dial -->
+                <div id="large-compass-dial" class="absolute inset-0 transition-transform duration-200 ease-out pointer-events-none">
+                    <div class="absolute top-2 left-1/2 transform -translate-x-1/2 text-red-500 font-bold text-lg leading-none">N</div>
+                    <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-lg leading-none">E</div>
+                    <div class="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-gray-500 font-bold text-lg leading-none">S</div>
+                    <div class="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-lg leading-none">W</div>
+                    <!-- Inner Ring -->
+                    <div class="absolute inset-4 rounded-full border border-gray-800 pointer-events-none"></div>
                 </div>
+
+                <div id="large-compass-container" class="transition-transform duration-200 ease-out w-24 h-24 text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)] z-10 flex items-center justify-center">
+                    <svg viewBox="0 0 24 24" class="w-full h-full fill-current" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="12 2 19 21 12 17 5 21 12 2" />
+                    </svg>
+                </div>
+            </div>
+            
+            <div class="mt-6 mb-8 w-full text-center">
+                <p class="text-sm text-gray-400 uppercase tracking-widest font-semibold mb-1">Distance</p>
+                <p id="large-compass-distance" class="text-4xl font-mono font-bold text-white tracking-tight">-- m</p>
             </div>
             
             <button onclick="closeModals()" class="px-6 py-3 bg-gray-700 text-white hover:bg-gray-600 rounded-xl font-medium shadow-md transition w-full">Close</button>
@@ -307,6 +317,7 @@
         let navTargetBearing = null;
         let orientationRequested = false;
         let currentNavRotation = 0; // Tracks rotation dynamically to prevent snapping
+        let currentDialRotation = 0; // Tracks dial rotation dynamically
 
         // Proj4 Definition for OS British National Grid (EPSG:27700)
         proj4.defs('EPSG:27700', '+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs');
@@ -1035,6 +1046,9 @@
             const distMeters = map.distance([userPos.lat, userPos.lng], [target.lat, target.lng]);
             const distText = distMeters > 1000 ? (distMeters / 1000).toFixed(2) + ' km' : Math.round(distMeters) + ' m';
             document.getElementById('nav-distance').innerText = distText;
+            
+            const largeDistanceEl = document.getElementById('large-compass-distance');
+            if (largeDistanceEl) largeDistanceEl.innerText = distText;
 
             // Bearing
             navTargetBearing = calculateBearing(userPos.lat, userPos.lng, target.lat, target.lng);
@@ -1045,13 +1059,17 @@
             if (navTargetBearing === null) return;
             const compContainer = document.getElementById('nav-compass-container');
             const largeCompContainer = document.getElementById('large-compass-container');
+            const dialContainer = document.getElementById('large-compass-dial');
             
             let targetRotation = navTargetBearing;
+            let dialRotation = 0;
             
             if (deviceHeading !== null && !isNaN(deviceHeading)) {
                 targetRotation = navTargetBearing - deviceHeading;
+                dialRotation = -deviceHeading;
             } else if (userPos && userPos.heading !== null && !isNaN(userPos.heading)) {
                 targetRotation = navTargetBearing - userPos.heading;
+                dialRotation = -userPos.heading;
             }
             
             // Calculate shortest path for rotation to stop CSS spinning around 360 backwards
@@ -1063,6 +1081,14 @@
             
             compContainer.style.transform = `rotate(${currentNavRotation}deg)`;
             if (largeCompContainer) largeCompContainer.style.transform = `rotate(${currentNavRotation}deg)`;
+            
+            if (dialContainer) {
+                let dialDelta = dialRotation - (currentDialRotation % 360);
+                if (dialDelta > 180) dialDelta -= 360;
+                if (dialDelta < -180) dialDelta += 360;
+                currentDialRotation += dialDelta;
+                dialContainer.style.transform = `rotate(${currentDialRotation}deg)`;
+            }
         }
 
         function stopNavigation() {
