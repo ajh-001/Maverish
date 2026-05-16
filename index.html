@@ -133,9 +133,12 @@
             <div class="text-center text-gray-500 mt-10">No markers added yet.</div>
         </div>
         
-        <div class="p-4 border-t border-gray-200 bg-gray-50">
-            <button onclick="openAddMarkerModal()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
-                <i data-lucide="map-pin" class="w-5 h-5"></i> Add New Point
+        <div class="p-4 border-t border-gray-200 bg-gray-50 flex gap-3">
+            <button onclick="openSettingsModal()" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 p-2 rounded-lg shadow-sm transition-colors flex items-center justify-center shrink-0" title="Settings">
+                <i data-lucide="settings" class="w-6 h-6"></i>
+            </button>
+            <button onclick="openAddMarkerModal()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 shadow-sm rounded-lg flex items-center justify-center gap-2 transition-colors">
+                <i data-lucide="plus" class="w-5 h-5"></i> Add Point
             </button>
         </div>
     </div>
@@ -237,6 +240,39 @@
             </div>
         </div>
 
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col max-h-[90vh]">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-gray-800">Global Settings</h3>
+                <button onclick="closeModals()" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            
+            <div class="p-4 space-y-5 overflow-y-auto">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Marker Appearance</label>
+                    <select id="setting-shape" class="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="dot">Classic Dot</option>
+                        <option value="pin">Waterdrop Pin</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Marker Color</label>
+                    <div class="flex items-center gap-3 bg-gray-50 border border-gray-300 rounded-lg p-2">
+                        <input type="color" id="setting-color" class="h-8 w-12 cursor-pointer rounded border-0 bg-transparent p-0">
+                        <span class="text-sm text-gray-600 font-medium">Select primary color</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-gray-200 bg-gray-50 rounded-b-xl flex justify-end space-x-3">
+                <button onclick="closeModals()" class="px-4 py-2 text-gray-600 font-medium hover:bg-gray-200 rounded-lg transition">Cancel</button>
+                <button onclick="saveSettings()" class="px-4 py-2 bg-blue-600 text-white font-medium hover:bg-blue-700 rounded-lg shadow-md transition">Apply</button>
+            </div>
+        </div>
+
         <!-- Custom Confirm Dialog -->
         <div id="confirm-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col text-center p-6">
             <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
@@ -261,24 +297,28 @@
         </div>
 
         <!-- Large Compass Modal -->
-        <div id="compass-modal" class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col items-center justify-center p-8 border border-gray-700 text-center">
+        <div id="compass-modal" class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col items-center justify-center p-8 border border-gray-700 text-center mx-auto">
             <h3 class="text-xl font-bold text-gray-100 mb-6 flex items-center justify-center gap-2 w-full">
                 <i data-lucide="navigation-2" class="w-5 h-5 text-blue-400"></i>
                 Navigation Heading
             </h3>
             
-            <div class="relative w-56 h-56 rounded-full border-4 border-gray-700 flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,0.5),0_0_30px_rgba(0,0,0,0.3)] bg-gray-900 shrink-0 overflow-hidden">
+            <div class="relative w-56 h-56 mx-auto rounded-full border-4 border-gray-700 flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,0.5),0_0_30px_rgba(0,0,0,0.3)] bg-gray-900 shrink-0 overflow-hidden">
                 <!-- Rotating Dial -->
                 <div id="large-compass-dial" class="absolute inset-0 transition-transform duration-200 ease-out pointer-events-none">
-                    <div class="absolute top-2 left-1/2 transform -translate-x-1/2 text-red-500 font-bold text-lg leading-none">N</div>
-                    <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-lg leading-none">E</div>
-                    <div class="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-gray-500 font-bold text-lg leading-none">S</div>
-                    <div class="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-lg leading-none">W</div>
+                    
+                    <!-- Tick Marks Container -->
+                    <div id="compass-ticks-container" class="absolute inset-0"></div>
+
+                    <div class="absolute top-2 left-1/2 transform -translate-x-1/2 text-red-500 font-bold text-lg leading-none z-10">N</div>
+                    <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-lg leading-none z-10">E</div>
+                    <div class="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-gray-500 font-bold text-lg leading-none z-10">S</div>
+                    <div class="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-lg leading-none z-10">W</div>
                     <!-- Inner Ring -->
-                    <div class="absolute inset-4 rounded-full border border-gray-800 pointer-events-none"></div>
+                    <div class="absolute inset-7 rounded-full border border-gray-700 pointer-events-none opacity-50"></div>
                 </div>
 
-                <div id="large-compass-container" class="transition-transform duration-200 ease-out w-24 h-24 text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)] z-10 flex items-center justify-center">
+                <div id="large-compass-container" class="absolute inset-0 m-auto transition-transform duration-200 ease-out w-24 h-24 text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)] z-10 flex items-center justify-center">
                     <svg viewBox="0 0 24 24" class="w-full h-full fill-current" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polygon points="12 2 19 21 12 17 5 21 12 2" />
                     </svg>
@@ -318,6 +358,9 @@
         let orientationRequested = false;
         let currentNavRotation = 0; // Tracks rotation dynamically to prevent snapping
         let currentDialRotation = 0; // Tracks dial rotation dynamically
+        
+        let globalMarkerColor = '#ef4444'; // Default to red
+        let globalMarkerShape = 'dot'; // 'dot' or 'pin'
 
         // Proj4 Definition for OS British National Grid (EPSG:27700)
         proj4.defs('EPSG:27700', '+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs');
@@ -341,6 +384,8 @@
 
         // --- Initialization ---
         function initMap() {
+            loadSettingsFromStorage();
+            
             const useOS = currentMapType === 'os_combined';
             const options = { zoomControl: false, center: [51.505, -0.09], zoom: useOS ? 7 : 10 };
             
@@ -367,6 +412,7 @@
             }
 
             initUserMarker();
+            initCompassTicks();
             setupMapListeners();
             startTracking();
             lucide.createIcons();
@@ -378,6 +424,28 @@
             window.addEventListener('touchstart', requestOrientationPermission, { once: true });
 
             loadMarkersFromStorage();
+        }
+
+        function initCompassTicks() {
+            const container = document.getElementById('compass-ticks-container');
+            if (!container) return;
+            
+            for (let i = 0; i < 360; i += 15) {
+                if (i % 90 === 0) continue; // Skip cardinal directions to leave room for N E S W text
+                
+                const isLarge = i % 45 === 0;
+                const tickWrapper = document.createElement('div');
+                tickWrapper.className = 'absolute inset-0 flex justify-center';
+                tickWrapper.style.transform = `rotate(${i}deg)`;
+                
+                const tick = document.createElement('div');
+                tick.className = `rounded-full mt-1 ${isLarge ? 'bg-gray-400' : 'bg-gray-600'}`;
+                tick.style.width = isLarge ? '3px' : '2px';
+                tick.style.height = isLarge ? '12px' : '6px';
+                
+                tickWrapper.appendChild(tick);
+                container.appendChild(tickWrapper);
+            }
         }
 
         // --- Persistence ---
@@ -403,6 +471,17 @@
                 } catch (e) {
                     console.error("Failed to load markers from storage", e);
                 }
+            }
+        }
+        
+        function loadSettingsFromStorage() {
+            const saved = localStorage.getItem('maverish_settings');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.color) globalMarkerColor = parsed.color;
+                    if (parsed.shape) globalMarkerShape = parsed.shape;
+                } catch(e) {}
             }
         }
 
@@ -763,13 +842,30 @@
                 </div>
             `;
         }
+        
+        function getCustomIcon() {
+            if (globalMarkerShape === 'pin') {
+                const svg = `<svg width="28" height="42" viewBox="0 0 24 36" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C5.373 0 0 5.373 0 12c0 9 12 24 12 24s12-15 12-24c0-6.627-5.373-12-12-12zm0 17c-2.761 0-5-2.239-5-5s2.239-5 5-5 5 2.239 5 5-2.239 5-5 5z" fill="${globalMarkerColor}" stroke="#ffffff" stroke-width="2"/></svg>`;
+                return L.divIcon({
+                    html: `<div class="drop-shadow-md">${svg}</div>`,
+                    className: 'custom-poi',
+                    iconSize: [28, 42],
+                    iconAnchor: [14, 42],
+                    popupAnchor: [0, -42] // ensures popup appears above the pin
+                });
+            } else {
+                return L.divIcon({
+                    html: `<div style="background-color: ${globalMarkerColor};" class="rounded-full w-4 h-4 border-2 border-white shadow-md"></div>`,
+                    className: 'custom-poi', 
+                    iconSize: [16, 16], 
+                    iconAnchor: [8, 8],
+                    popupAnchor: [0, -8]
+                });
+            }
+        }
 
         function createLeafletMarker(m) {
-            const icon = L.divIcon({
-                html: `<div class="bg-red-500 rounded-full w-4 h-4 border-2 border-white shadow-md"></div>`,
-                className: 'custom-poi', iconSize: [16,16], iconAnchor: [8,8]
-            });
-            const lm = L.marker([m.lat, m.lng], { icon: icon }).bindPopup(getPopupContent(m));
+            const lm = L.marker([m.lat, m.lng], { icon: getCustomIcon() }).bindPopup(getPopupContent(m));
             if (m.isVisible) lm.addTo(map);
             return lm;
         }
@@ -823,6 +919,7 @@
 
         function startMapPick() {
             closeModals();
+            closeDrawerIfOpen();
             document.getElementById('map-pick-banner').classList.remove('hidden');
             map.getContainer().style.cursor = 'crosshair';
             map.once('click', handleMapClick);
@@ -999,6 +1096,33 @@
             closeModals();
             renderMarkerList();
         }
+        
+        // --- Settings Management ---
+        function openSettingsModal() {
+            closeDrawerIfOpen();
+            document.getElementById('setting-color').value = globalMarkerColor;
+            document.getElementById('setting-shape').value = globalMarkerShape;
+            showModal('settings-modal');
+        }
+
+        function saveSettings() {
+            globalMarkerColor = document.getElementById('setting-color').value;
+            globalMarkerShape = document.getElementById('setting-shape').value;
+            
+            // Save to localStorage
+            const settings = { color: globalMarkerColor, shape: globalMarkerShape };
+            localStorage.setItem('maverish_settings', JSON.stringify(settings));
+            
+            // Re-render all existing markers on the map to reflect new style
+            markers.forEach(m => {
+                if (m.leafletMarker) {
+                    m.leafletMarker.setIcon(getCustomIcon());
+                }
+            });
+            
+            closeModals();
+            renderMarkerList();
+        }
 
         // --- Navigation Logic ---
         function startNavigation(id) {
@@ -1121,7 +1245,7 @@
             if (closeModalsTimeout) clearTimeout(closeModalsTimeout);
             document.getElementById('modal-overlay').classList.remove('modal-fade-out');
             document.getElementById('modal-overlay').classList.add('modal-fade-in');
-            ['marker-modal', 'confirm-modal', 'alert-modal', 'compass-modal'].forEach(m => document.getElementById(m).classList.add('hidden'));
+            ['marker-modal', 'confirm-modal', 'alert-modal', 'compass-modal', 'settings-modal'].forEach(m => document.getElementById(m).classList.add('hidden'));
             document.getElementById(id).classList.remove('hidden');
         }
 
@@ -1129,7 +1253,7 @@
             document.getElementById('modal-overlay').classList.remove('modal-fade-in');
             document.getElementById('modal-overlay').classList.add('modal-fade-out');
             closeModalsTimeout = setTimeout(() => {
-                ['marker-modal', 'confirm-modal', 'alert-modal', 'compass-modal'].forEach(m => document.getElementById(m).classList.add('hidden'));
+                ['marker-modal', 'confirm-modal', 'alert-modal', 'compass-modal', 'settings-modal'].forEach(m => document.getElementById(m).classList.add('hidden'));
             }, 300);
         }
 
