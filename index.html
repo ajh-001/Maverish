@@ -517,6 +517,16 @@
             L.tileLayer(`https://api.os.uk/maps/raster/v1/zxy/Road_27700/{z}/{x}/{y}.png?key=${osApiKey}`, { minZoom: 10, maxZoom: 13 })
         ]);
 
+        // --- Utility to convert Blob to ArrayBuffer ---
+        function blobToArrayBuffer(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(blob);
+            });
+        }
+
         // --- Init ---
         async function initApp() {
             loadSettingsFromStorage();
@@ -988,8 +998,19 @@
             const editId = document.getElementById('edit-item-id').value;
             const id = editId || 'ov_' + Date.now();
             
+            // Read image blob into a universally serializable ArrayBuffer to bypass WebView/DataClone errors
+            let imageBuffer;
+            try {
+                imageBuffer = await blobToArrayBuffer(activeOverlayImgBlob);
+            } catch (err) {
+                showAlert("File Error", "Could not read the overlay image file.");
+                return;
+            }
+
             const payload = {
-                id, name, imageBlob: activeOverlayImgBlob,
+                id, name, 
+                imageBuffer: imageBuffer,
+                imageType: activeOverlayImgBlob.type,
                 calibration: { lat: imgCenter.lat, lng: imgCenter.lng, width: imgWidthLng, height: imgHeightLat, rotation: imgRotation, opacity: imgOpacity },
                 savedView: {
                     lat: map.getCenter().lat,
@@ -1011,7 +1032,15 @@
                 closeBottomPanel();
                 renderOverlayList();
                 updateOpacitySliderVisibility();
-            } catch(e) { showAlert("Error", "Could not save overlay data."); }
+            } catch(e) { 
+                console.error("IndexedDB Save Failed", e);
+                // Graceful guidance for partitioned sandboxes (Safari inside an Iframe)
+                if (e.name === 'SecurityError' || e.message.includes('SecurityError') || e.message.includes('partitioned')) {
+                    showAlert("Storage Blocked", "Your browser is blocking local database access. This is common when viewing within an iframe preview on Safari or using Private Browsing. Please open the app directly outside this frame or use Chrome.");
+                } else {
+                    showAlert("Save Failed", "Could not save overlay data: " + e.message);
+                }
+            }
         }
 
         async function activateOverlay(id) {
@@ -1023,8 +1052,19 @@
                 if (activeOverlayBlobUrl) URL.revokeObjectURL(activeOverlayBlobUrl);
 
                 activeOverlayId = id;
-                activeOverlayImgBlob = data.imageBlob;
-                activeOverlayBlobUrl = URL.createObjectURL(data.imageBlob);
+                
+                // Backwards-compatible load mechanism (ArrayBuffer fallback to legacy Blob storage)
+                let blob;
+                if (data.imageBuffer) {
+                    blob = new Blob([data.imageBuffer], { type: data.imageType || 'image/jpeg' });
+                } else if (data.imageBlob) {
+                    blob = data.imageBlob;
+                } else {
+                    throw new Error("No image data found in local document database.");
+                }
+
+                activeOverlayImgBlob = blob;
+                activeOverlayBlobUrl = URL.createObjectURL(blob);
 
                 imgCenter = L.latLng(data.calibration.lat, data.calibration.lng);
                 imgWidthLng = data.calibration.width;
