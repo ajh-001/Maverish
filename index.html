@@ -29,8 +29,14 @@
 
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background-color: #f3f4f6; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 10; }
         
+        #map, #ui-layer { transition: bottom 0.3s ease-out; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 10; }
+        #ui-layer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 20; }
+        
+        /* Map Squeeze Class */
+        .map-squeezed { bottom: 380px !important; }
+
         /* Custom User Location Marker */
         .user-location-marker {
             background-color: #3b82f6;
@@ -45,8 +51,6 @@
             100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
         }
 
-        /* UI Overlays */
-        #ui-layer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 20; }
         .pointer-events-auto { pointer-events: auto; }
         
         /* Drawer transitions */
@@ -67,78 +71,163 @@
     <!-- Map Container -->
     <div id="map"></div>
 
-    <!-- Permanent Center Crosshair -->
-    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none z-[15] text-gray-800 drop-shadow-[0_0_2px_rgba(255,255,255,0.8)] opacity-60">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
-    </div>
-
-    <!-- UI Overlay Layer -->
+    <!-- UI Overlay Layer (Squeezes with the Map) -->
     <div id="ui-layer" class="flex flex-col justify-between">
         
+        <!-- Permanent Center Crosshair -->
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none text-gray-800 drop-shadow-[0_0_2px_rgba(255,255,255,0.8)] opacity-60">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+        </div>
+
         <!-- Top Navigation Bar (Hidden by default) -->
-        <div id="nav-bar" class="bg-gray-700 text-white shadow-lg p-4 flex items-center justify-between transform -translate-y-full transition-transform duration-300 pointer-events-auto">
-            <div class="flex items-center space-x-4">
+        <div id="nav-bar" class="bg-gray-700 text-white shadow-lg p-3 flex items-center justify-between transform -translate-y-full transition-transform duration-300 pointer-events-auto relative z-10">
+            <div class="flex items-center space-x-3">
                 <button onclick="openCompassModal()" class="bg-gray-900 w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors cursor-pointer shrink-0">
-                    <div id="nav-compass-container" class="transition-transform duration-200 ease-out w-6 h-6 text-blue-400">
+                    <div id="nav-compass-container" class="transition-transform duration-200 ease-out w-5 h-5 text-blue-400">
                         <svg viewBox="0 0 24 24" class="w-full h-full fill-current drop-shadow-sm" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polygon points="12 2 19 21 12 17 5 21 12 2" />
                         </svg>
                     </div>
                 </button>
                 <div>
-                    <h2 class="text-sm font-semibold opacity-80">Navigationalising to</h2>
-                    <p id="nav-target-name" class="text-lg font-bold">Target Point</p>
-                    <p id="nav-distance" class="text-sm font-medium tracking-wide">-- m</p>
+                    <h2 class="text-xs font-semibold opacity-80 uppercase tracking-wider">Navigating to</h2>
+                    <p id="nav-target-name" class="text-base font-bold">Target Point</p>
+                    <p id="nav-distance" class="text-xs font-medium tracking-wide">-- m</p>
                 </div>
             </div>
-            <button onclick="stopNavigation()" class="bg-red-500 hover:bg-red-600 text-white w-10 h-10 flex items-center justify-center rounded-full shadow-md transition-colors shrink-0">
-                <i data-lucide="x" class="w-6 h-6"></i>
+            <button onclick="stopNavigation()" class="bg-red-500 hover:bg-red-600 text-white w-9 h-9 flex items-center justify-center rounded-full shadow-md transition-colors shrink-0">
+                <i data-lucide="x" class="w-5 h-5"></i>
             </button>
         </div>
 
         <!-- Floating Action Buttons -->
-        <div id="left-fabs" class="absolute bottom-6 left-6 pointer-events-auto">
-            <button onclick="toggleDrawer()" class="bg-white w-14 h-14 flex items-center justify-center rounded-xl shadow-lg border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <i data-lucide="menu" class="w-6 h-6 text-gray-700"></i>
+        <div class="absolute bottom-6 left-6 pointer-events-auto z-10">
+            <button onclick="toggleDrawer()" class="bg-white w-12 h-12 flex items-center justify-center rounded-xl shadow-lg border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <i data-lucide="menu" class="w-5 h-5 text-gray-700"></i>
             </button>
         </div>
 
-        <div id="right-fabs" class="absolute bottom-6 right-6 flex flex-col space-y-4 pointer-events-auto">
-            <button id="center-btn" onclick="centerOnUser()" class="bg-white w-14 h-14 flex items-center justify-center rounded-full shadow-lg border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
-                <i data-lucide="crosshair" class="w-6 h-6 text-blue-600 transition-colors"></i>
+        <div class="absolute bottom-6 right-6 flex flex-col space-y-4 pointer-events-auto z-10">
+            <button id="center-btn" onclick="centerOnUser()" class="bg-white w-12 h-12 flex items-center justify-center rounded-full shadow-lg border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+                <i data-lucide="crosshair" class="w-5 h-5 text-blue-600 transition-colors"></i>
             </button>
-            <button onclick="openAddMarkerModal()" class="bg-blue-600 w-14 h-14 flex items-center justify-center rounded-full shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                <i data-lucide="plus" class="w-6 h-6 text-white"></i>
-            </button>
-        </div>
-
-        <!-- Confirm Position Mode Button -->
-        <div id="confirm-position-container" class="absolute bottom-8 left-1/2 transform -translate-x-1/2 pointer-events-auto hidden items-center justify-center z-30">
-            <button onclick="confirmMapMove()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-full shadow-2xl flex items-center gap-2 transition-transform transform hover:scale-105 border-2 border-white">
-                <i data-lucide="check" class="w-5 h-5"></i> Confirm Position
+            <button onclick="openMarkerPanel()" class="bg-blue-600 w-12 h-12 flex items-center justify-center rounded-full shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                <i data-lucide="plus" class="w-5 h-5 text-white"></i>
             </button>
         </div>
+    </div>
 
+    <!-- Marker Panel (Bottom Sheet) -->
+    <div id="marker-panel" class="fixed bottom-0 left-0 right-0 h-[380px] bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.15)] z-[35] transform translate-y-full transition-transform duration-300 flex flex-col pointer-events-auto">
+        <div class="p-3 border-b border-gray-200 flex justify-between items-center bg-gray-50 shrink-0">
+            <h3 id="panel-title" class="text-base font-bold text-gray-800">Add Marker</h3>
+            <button onclick="closeMarkerPanel()" class="text-gray-400 hover:text-gray-600 p-1">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        
+        <div class="p-4 overflow-y-auto flex-1 bg-white">
+            <input type="hidden" id="edit-marker-id" value="">
+            
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Name / Label</label>
+                <input type="text" id="marker-name" placeholder="e.g., Summit, Basecamp" class="w-full text-sm border border-gray-300 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Input Method</label>
+                <select id="coord-format" onchange="updateCoordInputs()" class="w-full text-sm border border-gray-300 rounded-lg p-2 bg-gray-50">
+                    <option value="map">Map Crosshair</option>
+                    <option value="dd">Decimal Degrees (DD)</option>
+                    <option value="ddm">Degrees, Dec Minutes (DDM)</option>
+                    <option value="dms">Degrees, Min, Sec (DMS)</option>
+                    <option value="os">OS Grid (Easting/Northing)</option>
+                </select>
+            </div>
+
+            <!-- Dynamic Input Areas -->
+            <div id="input-map" class="text-center p-3 bg-blue-50 rounded-lg border border-blue-100">
+                <p class="text-xs text-blue-800 mb-2">Pan the map to position the crosshair.</p>
+                <p id="picked-coords-display" class="text-lg font-mono font-bold text-blue-900 tracking-wide"></p>
+            </div>
+
+            <div id="input-dd" class="hidden space-y-3">
+                <div class="flex gap-2">
+                    <div class="flex-1">
+                        <label class="text-xs text-gray-500 block mb-1">Latitude</label>
+                        <input type="number" id="dd-lat" step="any" placeholder="51.505" class="w-full text-sm border border-gray-300 rounded-lg p-2" oninput="syncCoords('dd')">
+                    </div>
+                    <div class="flex-1">
+                        <label class="text-xs text-gray-500 block mb-1">Longitude</label>
+                        <input type="number" id="dd-lng" step="any" placeholder="-0.09" class="w-full text-sm border border-gray-300 rounded-lg p-2" oninput="syncCoords('dd')">
+                    </div>
+                </div>
+            </div>
+
+            <div id="input-ddm" class="hidden space-y-3">
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lat Degrees</label><input type="number" id="ddm-lat-d" class="w-full text-sm border border-gray-300 rounded-lg p-2" oninput="syncCoords('ddm')"></div>
+                    <div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lat Dec Mins</label><input type="number" id="ddm-lat-m" step="any" class="w-full text-sm border border-gray-300 rounded-lg p-2" oninput="syncCoords('ddm')"></div>
+                    <div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lng Degrees</label><input type="number" id="ddm-lng-d" class="w-full text-sm border border-gray-300 rounded-lg p-2" oninput="syncCoords('ddm')"></div>
+                    <div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lng Dec Mins</label><input type="number" id="ddm-lng-m" step="any" class="w-full text-sm border border-gray-300 rounded-lg p-2" oninput="syncCoords('ddm')"></div>
+                </div>
+            </div>
+
+            <div id="input-dms" class="hidden space-y-3">
+                 <div class="grid grid-cols-3 gap-2 mb-2">
+                    <div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lat Deg</label><input type="number" id="dms-lat-d" class="w-full text-sm border border-gray-300 rounded-lg p-2" oninput="syncCoords('dms')"></div>
+                    <div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lat Min</label><input type="number" id="dms-lat-m" class="w-full text-sm border border-gray-300 rounded-lg p-2" oninput="syncCoords('dms')"></div>
+                    <div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lat Sec</label><input type="number" id="dms-lat-s" step="any" class="w-full text-sm border border-gray-300 rounded-lg p-2" oninput="syncCoords('dms')"></div>
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                    <div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lng Deg</label><input type="number" id="dms-lng-d" class="w-full text-sm border border-gray-300 rounded-lg p-2" oninput="syncCoords('dms')"></div>
+                    <div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lng Min</label><input type="number" id="dms-lng-m" class="w-full text-sm border border-gray-300 rounded-lg p-2" oninput="syncCoords('dms')"></div>
+                    <div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lng Sec</label><input type="number" id="dms-lng-s" step="any" class="w-full text-sm border border-gray-300 rounded-lg p-2" oninput="syncCoords('dms')"></div>
+                </div>
+            </div>
+
+            <div id="input-os" class="hidden space-y-3">
+                 <p class="text-xs text-gray-500 mb-2">Standard OS National Grid Reference.</p>
+                 <div class="flex gap-2">
+                    <div class="flex-1">
+                        <label class="text-xs text-gray-500 block mb-1">Easting (X)</label>
+                        <input type="number" id="os-easting" placeholder="e.g. 400000" class="w-full text-sm border border-gray-300 rounded-lg p-2" oninput="syncCoords('os')">
+                    </div>
+                    <div class="flex-1">
+                        <label class="text-xs text-gray-500 block mb-1">Northing (Y)</label>
+                        <input type="number" id="os-northing" placeholder="e.g. 300000" class="w-full text-sm border border-gray-300 rounded-lg p-2" oninput="syncCoords('os')">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-3 border-t border-gray-200 bg-gray-50 flex justify-between items-center space-x-3 shrink-0">
+            <button id="panel-delete-btn" class="px-4 py-2 text-red-600 text-sm font-medium hover:bg-red-100 rounded-lg transition hidden">Delete</button>
+            <div class="flex space-x-3 ml-auto">
+                <button onclick="closeMarkerPanel()" class="px-4 py-2 text-gray-600 text-sm font-medium hover:bg-gray-200 rounded-lg transition">Cancel</button>
+                <button onclick="saveMarker()" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 rounded-lg shadow-md transition">Save</button>
+            </div>
+        </div>
     </div>
 
     <!-- Side Drawer -->
-    <div id="drawer" class="absolute top-0 left-0 h-full w-96 max-w-[85vw] bg-white shadow-2xl z-30 drawer-closed transition-transform duration-300 flex flex-col pointer-events-auto">
+    <div id="drawer" class="absolute top-0 left-0 h-full w-80 max-w-[85vw] bg-white shadow-2xl z-[30] drawer-closed transition-transform duration-300 flex flex-col pointer-events-auto">
         <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-                <i data-lucide="map" class="w-6 h-6 text-blue-600"></i>
+            <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <i data-lucide="map" class="w-5 h-5 text-blue-600"></i>
                 Maverish Maps
             </h1>
             <button onclick="toggleDrawer()" class="p-2 text-gray-500 hover:text-gray-800 rounded-md">
-                <i data-lucide="x" class="w-6 h-6"></i>
+                <i data-lucide="x" class="w-5 h-5"></i>
             </button>
         </div>
 
         <div class="p-4 border-b border-gray-200">
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Base Map</label>
-            <select id="map-layer-select" onchange="changeBaseMap()" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
+            <label class="block text-xs font-semibold text-gray-700 mb-2">Base Map</label>
+            <select id="map-layer-select" onchange="changeBaseMap()" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2">
                 <option value="os_combined" selected>OS Maps (Leisure & Road)</option>
                 <option value="osm">OpenStreetMap</option>
                 <option value="topo">OpenTopoMap</option>
@@ -146,150 +235,54 @@
             </select>
         </div>
 
-        <div class="flex-1 overflow-y-auto no-scrollbar p-4" id="marker-list">
+        <div class="flex-1 overflow-y-auto no-scrollbar p-3" id="marker-list">
             <!-- Markers will be injected here -->
-            <div class="text-center text-gray-500 mt-10">No markers added yet.</div>
+            <div class="text-center text-xs text-gray-500 mt-10">No markers added yet.</div>
         </div>
         
-        <div class="p-4 border-t border-gray-200 bg-gray-50 flex gap-3">
+        <div class="p-3 border-t border-gray-200 bg-gray-50 flex gap-2">
             <button onclick="openSettingsModal()" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 p-2 rounded-lg shadow-sm transition-colors flex items-center justify-center shrink-0" title="Settings">
-                <i data-lucide="settings" class="w-6 h-6"></i>
+                <i data-lucide="settings" class="w-5 h-5"></i>
             </button>
-            <button onclick="openAddMarkerModal()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 shadow-sm rounded-lg flex items-center justify-center gap-2 transition-colors">
-                <i data-lucide="plus" class="w-5 h-5"></i> Add Point
+            <button onclick="openMarkerPanel()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 shadow-sm rounded-lg flex items-center justify-center gap-2 transition-colors">
+                <i data-lucide="plus" class="w-4 h-4"></i> Add Point
             </button>
         </div>
     </div>
 
     <!-- Modal Overlay -->
-    <div id="modal-overlay" class="absolute inset-0 bg-black bg-opacity-50 z-40 modal-fade-out transition-opacity duration-300 flex items-center justify-center pointer-events-none px-4">
+    <div id="modal-overlay" class="absolute inset-0 bg-black bg-opacity-50 z-[40] modal-fade-out transition-opacity duration-300 flex items-center justify-center pointer-events-none px-4">
         
-        <!-- Add/Edit Marker Modal -->
-        <div id="marker-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-md hidden pointer-events-auto flex-col max-h-[90vh]">
-            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
-                <h3 id="modal-title" class="text-lg font-bold text-gray-800">Add Marker</h3>
-                <button onclick="closeModals()" class="text-gray-400 hover:text-gray-600">
-                    <i data-lucide="x" class="w-6 h-6"></i>
-                </button>
-            </div>
-            
-            <div class="p-4 overflow-y-auto">
-                <input type="hidden" id="edit-marker-id" value="">
-                
-                <div class="mb-4">
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Name / Label</label>
-                    <input type="text" id="marker-name" placeholder="e.g., Summit, Basecamp" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500">
-                </div>
-
-                <div class="mb-4">
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Input Method</label>
-                    <select id="coord-format" onchange="updateCoordInputs()" class="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50">
-                        <option value="map">Map Crosshair</option>
-                        <option value="dd">Decimal Degrees (DD)</option>
-                        <option value="ddm">Degrees, Dec Minutes (DDM)</option>
-                        <option value="dms">Degrees, Min, Sec (DMS)</option>
-                        <option value="os">OS Grid (Easting/Northing)</option>
-                    </select>
-                </div>
-
-                <!-- Dynamic Input Areas -->
-                <div id="input-map" class="text-center p-4 bg-blue-50 rounded-lg border border-blue-100">
-                    <p class="text-sm text-blue-800 mb-2">Location captured from the map crosshair.</p>
-                    <p id="picked-coords-display" class="text-lg font-mono font-semibold text-gray-700 mb-3"></p>
-                    <button onclick="enableMapMoveMode()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg shadow-md flex items-center justify-center gap-2 w-full transition-colors">
-                        <i data-lucide="move" class="w-4 h-4"></i> Move Map
-                    </button>
-                </div>
-
-                <div id="input-dd" class="hidden space-y-3">
-                    <div class="flex gap-2">
-                        <div class="flex-1">
-                            <label class="text-xs text-gray-500 block mb-1">Latitude</label>
-                            <input type="number" id="dd-lat" step="any" placeholder="51.505" class="w-full border border-gray-300 rounded-lg p-2" oninput="syncCoords('dd')">
-                        </div>
-                        <div class="flex-1">
-                            <label class="text-xs text-gray-500 block mb-1">Longitude</label>
-                            <input type="number" id="dd-lng" step="any" placeholder="-0.09" class="w-full border border-gray-300 rounded-lg p-2" oninput="syncCoords('dd')">
-                        </div>
-                    </div>
-                </div>
-
-                <div id="input-ddm" class="hidden space-y-3">
-                    <div class="grid grid-cols-2 gap-2">
-                        <div><label class="text-xs text-gray-500 block mb-1">Lat Degrees</label><input type="number" id="ddm-lat-d" class="w-full border rounded-lg p-2" oninput="syncCoords('ddm')"></div>
-                        <div><label class="text-xs text-gray-500 block mb-1">Lat Dec Mins</label><input type="number" id="ddm-lat-m" step="any" class="w-full border rounded-lg p-2" oninput="syncCoords('ddm')"></div>
-                        <div><label class="text-xs text-gray-500 block mb-1">Lng Degrees</label><input type="number" id="ddm-lng-d" class="w-full border rounded-lg p-2" oninput="syncCoords('ddm')"></div>
-                        <div><label class="text-xs text-gray-500 block mb-1">Lng Dec Mins</label><input type="number" id="ddm-lng-m" step="any" class="w-full border rounded-lg p-2" oninput="syncCoords('ddm')"></div>
-                    </div>
-                </div>
-
-                <div id="input-dms" class="hidden space-y-3">
-                     <div class="grid grid-cols-3 gap-2 mb-2">
-                        <div><label class="text-xs text-gray-500 block mb-1">Lat Deg</label><input type="number" id="dms-lat-d" class="w-full border rounded-lg p-2" oninput="syncCoords('dms')"></div>
-                        <div><label class="text-xs text-gray-500 block mb-1">Lat Min</label><input type="number" id="dms-lat-m" class="w-full border rounded-lg p-2" oninput="syncCoords('dms')"></div>
-                        <div><label class="text-xs text-gray-500 block mb-1">Lat Sec</label><input type="number" id="dms-lat-s" step="any" class="w-full border rounded-lg p-2" oninput="syncCoords('dms')"></div>
-                    </div>
-                    <div class="grid grid-cols-3 gap-2">
-                        <div><label class="text-xs text-gray-500 block mb-1">Lng Deg</label><input type="number" id="dms-lng-d" class="w-full border rounded-lg p-2" oninput="syncCoords('dms')"></div>
-                        <div><label class="text-xs text-gray-500 block mb-1">Lng Min</label><input type="number" id="dms-lng-m" class="w-full border rounded-lg p-2" oninput="syncCoords('dms')"></div>
-                        <div><label class="text-xs text-gray-500 block mb-1">Lng Sec</label><input type="number" id="dms-lng-s" step="any" class="w-full border rounded-lg p-2" oninput="syncCoords('dms')"></div>
-                    </div>
-                </div>
-
-                <div id="input-os" class="hidden space-y-3">
-                     <p class="text-xs text-gray-500 mb-2">Standard OS National Grid Reference.</p>
-                     <div class="flex gap-2">
-                        <div class="flex-1">
-                            <label class="text-xs text-gray-500 block mb-1">Easting (X)</label>
-                            <input type="number" id="os-easting" placeholder="e.g. 400000" class="w-full border border-gray-300 rounded-lg p-2" oninput="syncCoords('os')">
-                        </div>
-                        <div class="flex-1">
-                            <label class="text-xs text-gray-500 block mb-1">Northing (Y)</label>
-                            <input type="number" id="os-northing" placeholder="e.g. 300000" class="w-full border border-gray-300 rounded-lg p-2" oninput="syncCoords('os')">
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="p-4 border-t border-gray-200 bg-gray-50 rounded-b-xl flex justify-between items-center space-x-3">
-                <button id="modal-delete-btn" class="px-4 py-2 text-red-600 font-medium hover:bg-red-100 rounded-lg transition hidden">Delete</button>
-                <div class="flex space-x-3 ml-auto">
-                    <button onclick="closeModals()" class="px-4 py-2 text-gray-600 font-medium hover:bg-gray-200 rounded-lg transition">Cancel</button>
-                    <button onclick="saveMarker()" class="px-4 py-2 bg-blue-600 text-white font-medium hover:bg-blue-700 rounded-lg shadow-md transition">Save</button>
-                </div>
-            </div>
-        </div>
-
         <!-- Settings Modal -->
         <div id="settings-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col max-h-[90vh]">
             <div class="p-4 border-b border-gray-200 flex justify-between items-center">
-                <h3 class="text-lg font-bold text-gray-800">Settings</h3>
+                <h3 class="text-base font-bold text-gray-800">Settings</h3>
                 <button onclick="closeModals()" class="text-gray-400 hover:text-gray-600">
-                    <i data-lucide="x" class="w-6 h-6"></i>
+                    <i data-lucide="x" class="w-5 h-5"></i>
                 </button>
             </div>
             
-            <div class="p-4 space-y-5 overflow-y-auto">
+            <div class="p-4 space-y-4 overflow-y-auto">
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">Marker Appearance</label>
-                    <select id="setting-shape" class="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 focus:ring-blue-500 focus:border-blue-500">
+                    <label class="block text-xs font-semibold text-gray-700 mb-2">Marker Appearance</label>
+                    <select id="setting-shape" class="w-full border border-gray-300 text-sm rounded-lg p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500">
                         <option value="dot">Classic Dot</option>
                         <option value="pin">Waterdrop Pin</option>
                     </select>
                 </div>
                 
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">Marker Color</label>
+                    <label class="block text-xs font-semibold text-gray-700 mb-2">Marker Color</label>
                     <div class="flex items-center gap-3 bg-gray-50 border border-gray-300 rounded-lg p-2">
                         <input type="color" id="setting-color" class="h-8 w-12 cursor-pointer rounded border-0 bg-transparent p-0">
-                        <span class="text-sm text-gray-600 font-medium">Select primary color</span>
+                        <span class="text-xs text-gray-600 font-medium">Select primary color</span>
                     </div>
                 </div>
             </div>
 
-            <div class="p-4 border-t border-gray-200 bg-gray-50 rounded-b-xl flex justify-end space-x-3">
-                <button onclick="closeModals()" class="px-4 py-2 text-gray-600 font-medium hover:bg-gray-200 rounded-lg transition">Cancel</button>
-                <button onclick="saveSettings()" class="px-4 py-2 bg-blue-600 text-white font-medium hover:bg-blue-700 rounded-lg shadow-md transition">Apply</button>
+            <div class="p-3 border-t border-gray-200 bg-gray-50 rounded-b-xl flex justify-end space-x-3">
+                <button onclick="closeModals()" class="px-4 py-2 text-gray-600 text-sm font-medium hover:bg-gray-200 rounded-lg transition">Cancel</button>
+                <button onclick="saveSettings()" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 rounded-lg shadow-md transition">Apply</button>
             </div>
         </div>
 
@@ -298,11 +291,11 @@
             <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
                 <i data-lucide="alert-triangle" class="h-6 w-6 text-red-600"></i>
             </div>
-            <h3 id="confirm-title" class="text-lg font-bold text-gray-900 mb-2">Are you sure?</h3>
-            <p id="confirm-message" class="text-sm text-gray-500 mb-6">This action cannot be undone.</p>
+            <h3 id="confirm-title" class="text-base font-bold text-gray-900 mb-2">Are you sure?</h3>
+            <p id="confirm-message" class="text-xs text-gray-500 mb-6">This action cannot be undone.</p>
             <div class="flex justify-center gap-3">
-                <button onclick="closeConfirm()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition w-full">Cancel</button>
-                <button id="confirm-action-btn" class="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg font-medium shadow-md transition w-full">Confirm</button>
+                <button onclick="closeConfirm()" class="px-4 py-2 text-gray-700 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition w-full">Cancel</button>
+                <button id="confirm-action-btn" class="px-4 py-2 bg-red-600 text-white text-sm hover:bg-red-700 rounded-lg font-medium shadow-md transition w-full">Confirm</button>
             </div>
         </div>
 
@@ -311,14 +304,14 @@
             <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4">
                 <i data-lucide="info" class="h-6 w-6 text-blue-600"></i>
             </div>
-            <h3 id="alert-title" class="text-lg font-bold text-gray-900 mb-2">Information</h3>
-            <p id="alert-message" class="text-sm text-gray-500 mb-6">Message</p>
-            <button onclick="closeModals()" class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-medium shadow-md transition w-full">OK</button>
+            <h3 id="alert-title" class="text-base font-bold text-gray-900 mb-2">Information</h3>
+            <p id="alert-message" class="text-xs text-gray-500 mb-6">Message</p>
+            <button onclick="closeModals()" class="px-4 py-2 bg-blue-600 text-white text-sm hover:bg-blue-700 rounded-lg font-medium shadow-md transition w-full">OK</button>
         </div>
 
         <!-- Large Compass Modal -->
         <div id="compass-modal" class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col items-center justify-center p-8 border border-gray-700 text-center mx-auto">
-            <h3 class="text-xl font-bold text-gray-100 mb-6 flex items-center justify-center gap-2 w-full">
+            <h3 class="text-lg font-bold text-gray-100 mb-6 flex items-center justify-center gap-2 w-full">
                 <i data-lucide="navigation-2" class="w-5 h-5 text-blue-400"></i>
                 Navigation Heading
             </h3>
@@ -330,10 +323,10 @@
                     <!-- Tick Marks Container -->
                     <div id="compass-ticks-container" class="absolute inset-0"></div>
 
-                    <div class="absolute top-2 left-1/2 transform -translate-x-1/2 text-red-500 font-bold text-lg leading-none z-10">N</div>
-                    <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-lg leading-none z-10">E</div>
-                    <div class="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-gray-500 font-bold text-lg leading-none z-10">S</div>
-                    <div class="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-lg leading-none z-10">W</div>
+                    <div class="absolute top-2 left-1/2 transform -translate-x-1/2 text-red-500 font-bold text-base leading-none z-10">N</div>
+                    <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-base leading-none z-10">E</div>
+                    <div class="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-gray-500 font-bold text-base leading-none z-10">S</div>
+                    <div class="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-base leading-none z-10">W</div>
                     <!-- Inner Ring -->
                     <div class="absolute inset-7 rounded-full border border-gray-700 pointer-events-none opacity-50"></div>
                 </div>
@@ -346,11 +339,11 @@
             </div>
             
             <div class="mt-6 mb-8 w-full text-center">
-                <p class="text-sm text-gray-400 uppercase tracking-widest font-semibold mb-1">Distance</p>
-                <p id="large-compass-distance" class="text-4xl font-mono font-bold text-white tracking-tight">-- m</p>
+                <p class="text-xs text-gray-400 uppercase tracking-widest font-semibold mb-1">Distance</p>
+                <p id="large-compass-distance" class="text-3xl font-mono font-bold text-white tracking-tight">-- m</p>
             </div>
             
-            <button onclick="closeModals()" class="px-6 py-3 bg-gray-700 text-white hover:bg-gray-600 rounded-xl font-medium shadow-md transition w-full">Close</button>
+            <button onclick="closeModals()" class="px-6 py-2 bg-gray-700 text-white text-sm hover:bg-gray-600 rounded-xl font-medium shadow-md transition w-full">Close</button>
         </div>
 
     </div>
@@ -378,12 +371,12 @@
         let orientationRequested = false;
         let currentNavRotation = 0; // Tracks rotation dynamically to prevent snapping
         let currentDialRotation = 0; // Tracks dial rotation dynamically
+        let isMarkerPanelOpen = false;
         
         let globalMarkerColor = '#ef4444'; // Default to red
         let globalMarkerShape = 'dot'; // 'dot' or 'pin'
         let initialCenter = [51.505, -0.09]; // Default center
         let initialZoom = null;
-        let isMapMoveModeActive = false;
 
         // Proj4 Definition for OS British National Grid (EPSG:27700)
         proj4.defs('EPSG:27700', '+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs');
@@ -537,8 +530,25 @@
                 }
             });
             
+            // Capture map movements for the bottom panel crosshair mode
+            map.on('move', () => {
+                if (isMarkerPanelOpen && document.getElementById('coord-format').value === 'map') {
+                    const center = map.getCenter();
+                    tempPickedCoords = center;
+                    document.getElementById('picked-coords-display').innerText = `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
+                }
+            });
+
             // Save map position/zoom changes
-            map.on('moveend', saveMapState);
+            map.on('moveend', () => {
+                if (isMarkerPanelOpen && document.getElementById('coord-format').value === 'map') {
+                    const center = map.getCenter();
+                    document.getElementById('dd-lat').value = center.lat.toFixed(6);
+                    document.getElementById('dd-lng').value = center.lng.toFixed(6);
+                    syncCoords('dd');
+                }
+                saveMapState();
+            });
             map.on('zoomend', saveMapState);
         }
 
@@ -709,11 +719,6 @@
                 navPolyline = L.polyline([], { color: 'blue', weight: 3, dashArray: '10, 10' }).addTo(map);
                 updateNavigation();
             }
-            
-            if (!document.getElementById('map-pick-banner').classList.contains('hidden')) {
-                map.once('click', handleMapClick);
-                map.getContainer().style.cursor = 'crosshair';
-            }
         }
 
         // --- Orientation Logic ---
@@ -778,7 +783,7 @@
             list.innerHTML = '';
             
             if (markers.length === 0) {
-                list.innerHTML = '<div class="text-center text-gray-500 mt-10">No markers saved.</div>';
+                list.innerHTML = '<div class="text-center text-xs text-gray-500 mt-10">No markers saved.</div>';
                 return;
             }
 
@@ -788,7 +793,7 @@
                 const eyeColor = m.isVisible ? 'text-blue-600' : 'text-gray-400';
                 
                 const item = document.createElement('div');
-                item.className = `p-3 relative after:content-[''] after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-gray-200 last:after:hidden ${isNav ? 'bg-green-50 rounded-lg' : ''}`;
+                item.className = `p-2 relative after:content-[''] after:absolute after:bottom-0 after:left-3 after:right-3 after:h-px after:bg-gray-200 last:after:hidden ${isNav ? 'bg-green-50 rounded-lg' : ''}`;
                 
                 item.innerHTML = `
                     <div class="flex items-center justify-between gap-2">
@@ -796,35 +801,35 @@
                         <div class="flex items-center gap-2 min-w-0">
                             ${isNav ? '<i data-lucide="navigation-2" class="w-4 h-4 text-green-600 shrink-0"></i>' : ''}
 
-                            <h4 class="font-bold text-gray-800 truncate">
+                            <h4 class="text-sm font-bold text-gray-800 truncate">
                                 ${escapeHTML(m.name)}
                             </h4>
                         </div>
 
                         <div class="flex items-center space-x-1 bg-gray-50 rounded-lg border border-gray-100 p-1 shrink-0">
-                        <button onclick="centerOnMarker('${m.id}')" class="p-2 hover:bg-gray-200 rounded text-gray-700 transition" title="Centre View">
-                            <i data-lucide="crosshair" class="w-5 h-5"></i>
+                        <button onclick="centerOnMarker('${m.id}')" class="p-1 hover:bg-gray-200 rounded text-gray-700 transition" title="Centre View">
+                            <i data-lucide="crosshair" class="w-4 h-4"></i>
                         </button>
                         
                         ${isNav ? 
-                            `<button onclick="stopNavigation()" class="p-2 hover:bg-red-200 rounded text-red-600 transition" title="Stop Navigating">
-                                <i data-lucide="square" class="w-5 h-5 fill-current"></i>
+                            `<button onclick="stopNavigation()" class="p-1 hover:bg-red-200 rounded text-red-600 transition" title="Stop Navigating">
+                                <i data-lucide="square" class="w-4 h-4 fill-current"></i>
                             </button>` :
-                            `<button onclick="startNavigation('${m.id}')" class="p-2 hover:bg-blue-200 rounded text-blue-600 transition" title="Navigate">
-                                <i data-lucide="navigation" class="w-5 h-5"></i>
+                            `<button onclick="startNavigation('${m.id}')" class="p-1 hover:bg-blue-200 rounded text-blue-600 transition" title="Navigate">
+                                <i data-lucide="navigation" class="w-4 h-4"></i>
                             </button>`
                         }
 
-                        <button onclick="editMarker('${m.id}')" class="p-2 hover:bg-gray-200 rounded text-blue-600 transition" title="Edit">
-                            <i data-lucide="edit-2" class="w-5 h-5"></i>
+                        <button onclick="openMarkerPanel('${m.id}')" class="p-1 hover:bg-gray-200 rounded text-blue-600 transition" title="Edit">
+                            <i data-lucide="edit-2" class="w-4 h-4"></i>
                         </button>
                         
-                        <button onclick="toggleMarkerVisibility('${m.id}')" class="p-2 hover:bg-gray-200 rounded transition" ${isNav ? 'disabled title="Cannot hide while navigating"' : 'title="Toggle Visibility"'}>
-                            <i data-lucide="${eyeIcon}" class="w-5 h-5 ${isNav ? 'text-gray-300' : eyeColor}"></i>
+                        <button onclick="toggleMarkerVisibility('${m.id}')" class="p-1 hover:bg-gray-200 rounded transition" ${isNav ? 'disabled title="Cannot hide while navigating"' : 'title="Toggle Visibility"'}>
+                            <i data-lucide="${eyeIcon}" class="w-4 h-4 ${isNav ? 'text-gray-300' : eyeColor}"></i>
                         </button>
                         
-                        <button onclick="confirmDeleteMarker('${m.id}')" class="p-2 hover:bg-gray-200 rounded text-red-600 transition" ${isNav ? 'disabled title="Cannot delete active target"' : 'title="Delete"'}>
-                            <i data-lucide="trash-2" class="w-5 h-5 ${isNav ? 'text-gray-300' : ''}"></i>
+                        <button onclick="confirmDeleteMarker('${m.id}')" class="p-1 hover:bg-gray-200 rounded text-red-600 transition" ${isNav ? 'disabled title="Cannot delete active target"' : 'title="Delete"'}>
+                            <i data-lucide="trash-2" class="w-4 h-4 ${isNav ? 'text-gray-300' : ''}"></i>
                         </button>
                     </div>
                 </div>
@@ -854,6 +859,12 @@
             if (m) {
                 if(!m.isVisible) toggleMarkerVisibility(m.id);
 
+                // Disable auto-centering explicitly when user taps center on a marker!
+                if (isAutoCentering) {
+                    isAutoCentering = false;
+                    updateCenterButtonUI();
+                }
+
                 // OS maps use a different CRS + zoom range
                 const targetZoom = currentMapType === 'os_combined' ? 9 : 15;
 
@@ -871,6 +882,7 @@
                 saveMarkersToStorage(); // Save State
                 renderMarkerList();
                 closeConfirm();
+                closeMarkerPanel();
             }
         }
 
@@ -879,7 +891,7 @@
                 <div class="text-center min-w-[100px] p-1">
                     <b class="block mb-3 text-sm text-gray-800">${escapeHTML(m.name)}</b>
                     <div class="flex gap-2 justify-center">
-                        <button onclick="editMarker('${m.id}'); map.closePopup();" class="flex-1 flex justify-center items-center bg-blue-100 text-blue-700 p-2 rounded hover:bg-blue-200 transition-colors" title="Edit">
+                        <button onclick="openMarkerPanel('${m.id}'); map.closePopup();" class="flex-1 flex justify-center items-center bg-blue-100 text-blue-700 p-2 rounded hover:bg-blue-200 transition-colors" title="Edit">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
                         </button>
                         <button onclick="startNavigation('${m.id}'); map.closePopup();" class="flex-1 flex justify-center items-center bg-green-100 text-green-700 p-2 rounded hover:bg-green-200 transition-colors" title="Navigate">
@@ -917,62 +929,86 @@
             return lm;
         }
 
-        // --- Add / Edit Modals & Input ---
-        function openAddMarkerModal() {
-            currentEditingId = null;
-            
-            // Capture crosshair coordinates immediately
-            const center = map.getCenter();
-            tempPickedCoords = center;
-            
-            document.getElementById('edit-marker-id').value = '';
-            document.getElementById('marker-name').value = '';
-            document.getElementById('modal-title').innerText = 'Add New Marker';
-            document.getElementById('coord-format').value = 'map';
-            document.getElementById('modal-delete-btn').classList.add('hidden'); // Hide delete on Add Mode
-            
-            // Show captured coords
-            const display = document.getElementById('picked-coords-display');
-            display.classList.remove('hidden');
-            display.innerText = `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
-            
-            // Pre-populate DD fields for sync
-            document.getElementById('dd-lat').value = center.lat.toFixed(6);
-            document.getElementById('dd-lng').value = center.lng.toFixed(6);
-            syncCoords('dd');
-            
-            updateCoordInputs();
-            showModal('marker-modal');
-            if(!document.getElementById('drawer').classList.contains('drawer-closed')) toggleDrawer();
+        // --- Marker Panel (Bottom Sheet) & Input ---
+        function animateMapSqueeze(isOpening, targetLatLng = null) {
+            if (targetLatLng) {
+                // When flying to a new point, we wait for the panel transition to finish, invalidate size, then fly.
+                setTimeout(() => {
+                    map.invalidateSize({ pan: false });
+                    map.flyTo(targetLatLng, map.getZoom(), { animate: true, duration: 0.5 });
+                }, 300);
+            } else {
+                // Smoothly pan the map vertically to keep the exact geographic center fixed perfectly under the crosshair
+                map.panBy([0, isOpening ? 190 : -190], { animate: true, duration: 0.3 });
+                setTimeout(() => {
+                    map.invalidateSize({ pan: false });
+                }, 300);
+            }
         }
 
-        function editMarker(id) {
-            const m = markers.find(x => x.id === id);
-            if (!m) return;
-            currentEditingId = id;
-            tempPickedCoords = { lat: m.lat, lng: m.lng };
+        function openMarkerPanel(editId = null) {
+            currentEditingId = editId;
+            isMarkerPanelOpen = true;
             
-            document.getElementById('edit-marker-id').value = id;
-            document.getElementById('marker-name').value = m.name;
-            document.getElementById('modal-title').innerText = 'Edit Marker';
+            // Squeeze the map & UI Layer visually upwards
+            document.getElementById('map').classList.add('map-squeezed');
+            document.getElementById('ui-layer').classList.add('map-squeezed');
             
-            // Show Delete on Edit Mode
-            document.getElementById('modal-delete-btn').classList.remove('hidden');
-            document.getElementById('modal-delete-btn').onclick = () => { confirmDeleteMarker(id); };
+            // Slide up the panel
+            document.getElementById('marker-panel').classList.remove('translate-y-full');
             
-            // Show current coords in case they swap to map mode
-            const display = document.getElementById('picked-coords-display');
-            display.classList.remove('hidden');
-            display.innerText = `${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}`;
+            if (window.innerWidth < 768) closeDrawerIfOpen();
 
-            // Set input format to DD and populate
-            document.getElementById('coord-format').value = 'dd';
-            document.getElementById('dd-lat').value = m.lat.toFixed(6);
-            document.getElementById('dd-lng').value = m.lng.toFixed(6);
+            if (editId) {
+                // Editing existing marker
+                const m = markers.find(x => x.id === editId);
+                if (!m) return;
+                
+                tempPickedCoords = { lat: m.lat, lng: m.lng };
+                document.getElementById('edit-marker-id').value = editId;
+                document.getElementById('marker-name').value = m.name;
+                document.getElementById('panel-title').innerText = 'Edit Marker';
+                
+                document.getElementById('panel-delete-btn').classList.remove('hidden');
+                document.getElementById('panel-delete-btn').onclick = () => { confirmDeleteMarker(editId); };
+                
+                document.getElementById('picked-coords-display').innerText = `${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}`;
+                document.getElementById('coord-format').value = 'map'; // Always default to map input for ease
+                
+                document.getElementById('dd-lat').value = m.lat.toFixed(6);
+                document.getElementById('dd-lng').value = m.lng.toFixed(6);
+                syncCoords('dd');
+                
+                // Pan map precisely to this point so the crosshair lands right on it
+                animateMapSqueeze(true, [m.lat, m.lng]);
+            } else {
+                // Adding a new marker
+                document.getElementById('edit-marker-id').value = '';
+                document.getElementById('marker-name').value = '';
+                document.getElementById('panel-title').innerText = 'Add New Marker';
+                document.getElementById('coord-format').value = 'map';
+                document.getElementById('panel-delete-btn').classList.add('hidden');
+                
+                const center = map.getCenter();
+                tempPickedCoords = center;
+                document.getElementById('picked-coords-display').innerText = `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
+                
+                document.getElementById('dd-lat').value = center.lat.toFixed(6);
+                document.getElementById('dd-lng').value = center.lng.toFixed(6);
+                syncCoords('dd');
+
+                animateMapSqueeze(true);
+            }
             
-            syncCoords('dd');
             updateCoordInputs();
-            showModal('marker-modal');
+        }
+
+        function closeMarkerPanel() {
+            document.getElementById('map').classList.remove('map-squeezed');
+            document.getElementById('ui-layer').classList.remove('map-squeezed');
+            document.getElementById('marker-panel').classList.add('translate-y-full');
+            isMarkerPanelOpen = false;
+            animateMapSqueeze(false);
         }
 
         function updateCoordInputs() {
@@ -981,78 +1017,6 @@
                 document.getElementById(`input-${id}`).classList.add('hidden');
             });
             document.getElementById(`input-${format}`).classList.remove('hidden');
-        }
-
-        
-function enableMapMoveMode() {
-            isMapMoveModeActive = true;
-
-            const overlay = document.getElementById('modal-overlay');
-            const markerModal = document.getElementById('marker-modal');
-
-            overlay.classList.remove('modal-fade-in');
-            overlay.classList.add('modal-fade-out');
-            overlay.style.pointerEvents = 'none';
-
-            markerModal.classList.add('hidden');
-            markerModal.style.display = 'none';
-
-            document.getElementById('left-fabs').classList.add('hidden');
-            document.getElementById('right-fabs').classList.add('hidden');
-
-            if (document.activeElement) {
-                document.activeElement.blur();
-            }
-
-            const confirmContainer = document.getElementById('confirm-position-container');
-            confirmContainer.classList.remove('hidden');
-            confirmContainer.classList.add('flex');
-
-            map.dragging.enable();
-            map.touchZoom.enable();
-            map.doubleClickZoom.enable();
-            map.scrollWheelZoom.enable();
-            map.boxZoom.enable();
-            map.keyboard.enable();
-
-            map.getContainer().style.cursor = '';
-        }
-
-        function exitMapMoveMode() {
-            isMapMoveModeActive = false;
-
-            const overlay = document.getElementById('modal-overlay');
-            const markerModal = document.getElementById('marker-modal');
-
-            overlay.classList.remove('modal-fade-out');
-            overlay.classList.add('modal-fade-in');
-            overlay.style.pointerEvents = '';
-
-            markerModal.classList.remove('hidden');
-            markerModal.style.display = 'flex';
-
-            document.getElementById('left-fabs').classList.remove('hidden');
-            document.getElementById('right-fabs').classList.remove('hidden');
-
-            const confirmContainer = document.getElementById('confirm-position-container');
-            confirmContainer.classList.add('hidden');
-            confirmContainer.classList.remove('flex');
-        }
-
-        function confirmMapMove() {
-            const center = map.getCenter();
-            tempPickedCoords = center;
-
-            const display = document.getElementById('picked-coords-display');
-            display.classList.remove('hidden');
-            display.innerText = `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
-
-            document.getElementById('dd-lat').value = center.lat.toFixed(6);
-            document.getElementById('dd-lng').value = center.lng.toFixed(6);
-
-            syncCoords('dd');
-
-            exitMapMoveMode();
         }
 
         function syncCoords(source) {
@@ -1129,6 +1093,14 @@ function enableMapMoveMode() {
                     document.getElementById('os-easting').value = osCoords[0].toFixed(2);
                     document.getElementById('os-northing').value = osCoords[1].toFixed(2);
                 }
+                
+                // If the user manually types new coordinates and the panel is open, cleanly pan the map to reflect those coords
+                if (source !== 'map' && isMarkerPanelOpen) {
+                    map.setView([lat, lng]);
+                    document.getElementById('picked-coords-display').innerText = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                    tempPickedCoords = {lat, lng};
+                }
+
             } catch (err) {
                 // Silently handle incomplete typing
             }
@@ -1141,7 +1113,7 @@ function enableMapMoveMode() {
 
             try {
                 if (format === 'map') {
-                    if (!tempPickedCoords) throw new Error("Please select a location on the map.");
+                    if (!tempPickedCoords) throw new Error("Please locate a position using the crosshair.");
                     lat = tempPickedCoords.lat; lng = tempPickedCoords.lng;
                 } else if (format === 'dd') {
                     lat = parseFloat(document.getElementById('dd-lat').value);
@@ -1199,7 +1171,7 @@ function enableMapMoveMode() {
             }
 
             saveMarkersToStorage(); // Save State
-            closeModals();
+            closeMarkerPanel();
             renderMarkerList();
         }
         
@@ -1326,7 +1298,6 @@ function enableMapMoveMode() {
                 map.removeLayer(navPolyline);
                 navPolyline = null;
             }
-            closeConfirm();
             renderMarkerList();
         }
 
@@ -1344,7 +1315,7 @@ function enableMapMoveMode() {
 
         // --- Custom Modals & Utilities ---
         
-let closeModalsTimeout = null;
+        let closeModalsTimeout = null;
 
         function showModal(id) {
             if (closeModalsTimeout) {
@@ -1358,7 +1329,6 @@ let closeModalsTimeout = null;
             overlay.style.pointerEvents = '';
 
             [
-                'marker-modal',
                 'settings-modal',
                 'confirm-modal',
                 'alert-modal',
@@ -1380,10 +1350,6 @@ let closeModalsTimeout = null;
         }
 
         function closeModals() {
-            if (isMapMoveModeActive) {
-                exitMapMoveMode();
-            }
-
             const overlay = document.getElementById('modal-overlay');
 
             overlay.classList.remove('modal-fade-in');
@@ -1391,7 +1357,6 @@ let closeModalsTimeout = null;
 
             closeModalsTimeout = setTimeout(() => {
                 [
-                    'marker-modal',
                     'settings-modal',
                     'confirm-modal',
                     'alert-modal',
