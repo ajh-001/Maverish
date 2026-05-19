@@ -39,6 +39,9 @@
         
         /* Map Squeeze Class */
         .map-squeezed { bottom: 380px !important; }
+        
+        /* Crosshair Cursor for Placement */
+        .map-placing-overlay, .map-placing-overlay .leaflet-interactive { cursor: crosshair !important; }
 
         /* Custom User Location Marker */
         .user-location-marker {
@@ -92,6 +95,14 @@
                 <line x1="12" y1="5" x2="12" y2="19"></line>
                 <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
+        </div>
+        
+        <!-- Map Instruction Banner for Image Placement -->
+        <div id="map-instruction-overlay" class="hidden absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white pl-6 pr-2 py-2 rounded-full shadow-lg z-[1000] font-bold pointer-events-auto flex items-center justify-between gap-4 w-11/12 max-w-md transition-opacity">
+            <span class="text-sm">Click map to place image center.</span>
+            <button onclick="cancelOverlayPlacement()" class="bg-blue-800 hover:bg-blue-900 rounded-full p-1.5 transition-colors">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
         </div>
 
         <!-- Top Navigation Bar -->
@@ -148,7 +159,7 @@
     <div id="bottom-panel" class="fixed bottom-0 left-0 right-0 h-[380px] bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.15)] z-[35] panel-closed transition-transform duration-300 flex flex-col pointer-events-auto">
         <div class="p-3 border-b border-gray-200 flex justify-between items-center bg-gray-50 shrink-0">
             <h3 id="panel-title" class="text-base font-bold text-gray-800">Add Item</h3>
-            <button onclick="closeBottomPanel()" class="text-gray-400 hover:text-gray-600 p-1">
+            <button onclick="cancelItem()" class="text-gray-400 hover:text-gray-600 p-1">
                 <i data-lucide="x" class="w-5 h-5"></i>
             </button>
         </div>
@@ -243,7 +254,7 @@
         <div class="p-3 border-t border-gray-200 bg-gray-50 flex justify-between items-center space-x-3 shrink-0">
             <button id="panel-delete-btn" class="px-4 py-2 text-red-600 text-sm font-medium hover:bg-red-100 rounded-lg transition hidden">Delete</button>
             <div class="flex space-x-3 ml-auto">
-                <button onclick="closeBottomPanel()" class="px-4 py-2 text-gray-600 text-sm font-medium hover:bg-gray-200 rounded-lg transition">Cancel</button>
+                <button onclick="cancelItem()" class="px-4 py-2 text-gray-600 text-sm font-medium hover:bg-gray-200 rounded-lg transition">Cancel</button>
                 <button onclick="saveItem()" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 rounded-lg shadow-md transition">Save</button>
             </div>
         </div>
@@ -473,6 +484,7 @@
         let currentNavRotation = 0; 
         let currentDialRotation = 0; 
         let isBottomPanelOpen = false;
+        let isPlacingOverlay = false;
         
         let globalMarkerColor = '#ef4444';
         let globalMarkerShape = 'dot';
@@ -619,6 +631,32 @@
         function setupMapListeners() {
             map.on('mousedown', closeDrawerIfOpen);
             map.on('dragstart', () => { if (isAutoCentering) { isAutoCentering = false; updateCenterButtonUI(); } });
+            
+            map.on('click', (e) => {
+                if (isPlacingOverlay) {
+                    isPlacingOverlay = false;
+                    document.getElementById('map-instruction-overlay').classList.add('hidden');
+                    document.getElementById('map').classList.remove('map-placing-overlay');
+                    
+                    imgCenter = e.latlng;
+                    imgRotation = 0;
+                    imgOpacity = parseInt(document.getElementById('floating-opacity-slider').value) || 60;
+                    const aspect = calImgObj.naturalWidth / calImgObj.naturalHeight;
+                    const mapBounds = map.getBounds();
+                    imgWidthLng = (mapBounds.getEast() - mapBounds.getWest()) * 0.4; 
+                    imgHeightLat = (imgWidthLng * Math.cos(imgCenter.lat * Math.PI / 180)) / aspect;
+                    
+                    if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
+                    const opacity = imgOpacity / 100;
+                    leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: 0 }).addTo(map);
+                    renderLeafletOverlay();
+                    
+                    setupPanelUI('overlay', '');
+                    animateMapSqueeze(true);
+                    updateOpacitySliderVisibility();
+                }
+            });
+
             map.on('move', () => {
                 if (isBottomPanelOpen && document.getElementById('edit-item-type').value === 'point' && document.getElementById('coord-format').value === 'map') {
                     const center = map.getCenter();
@@ -765,6 +803,21 @@
             }
         }
 
+        function cancelItem() {
+            const type = document.getElementById('edit-item-type').value;
+            const editId = document.getElementById('edit-item-id').value;
+            
+            if (type === 'overlay') {
+                if (!editId) {
+                    unloadOverlay();
+                } else {
+                    activateOverlay(editId); // Revert to saved state
+                }
+            }
+            
+            closeBottomPanel();
+        }
+
         function closeBottomPanel() {
             document.getElementById('map').classList.remove('map-squeezed');
             document.getElementById('ui-layer').classList.remove('map-squeezed');
@@ -888,7 +941,7 @@
         document.getElementById('overlay-file-input').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) {
-                if(!activeOverlayImgBlob) closeBottomPanel(); // Cancelled init file pick
+                if(!activeOverlayImgBlob) closeBottomPanel(); 
                 return;
             }
             
@@ -901,23 +954,38 @@
             calImgObj.onload = () => {
                 const isNew = !document.getElementById('edit-item-id').value;
                 if (isNew) {
-                    imgCenter = map.getCenter();
-                    imgRotation = 0;
-                    imgOpacity = parseInt(document.getElementById('floating-opacity-slider').value) || 60;
+                    isPlacingOverlay = true;
+                    
+                    // Temporarily hide the panel to give a full view for placement
+                    document.getElementById('bottom-panel').classList.replace('panel-open', 'panel-closed');
+                    document.getElementById('map').classList.remove('map-squeezed');
+                    document.getElementById('ui-layer').classList.remove('map-squeezed');
+                    isBottomPanelOpen = false;
+                    updateOpacitySliderVisibility();
+
+                    document.getElementById('map-instruction-overlay').classList.remove('hidden');
+                    document.getElementById('map').classList.add('map-placing-overlay');
+                    lucide.createIcons();
+                } else {
                     const aspect = calImgObj.naturalWidth / calImgObj.naturalHeight;
-                    const mapBounds = map.getBounds();
-                    imgWidthLng = (mapBounds.getEast() - mapBounds.getWest()) * 0.4; 
                     imgHeightLat = (imgWidthLng * Math.cos(imgCenter.lat * Math.PI / 180)) / aspect;
+                    
+                    if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
+                    const opacity = imgOpacity / 100;
+                    leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: 0 }).addTo(map);
+                    renderLeafletOverlay();
+                    updateOpacitySliderVisibility();
                 }
-                
-                if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
-                const opacity = imgOpacity / 100;
-                leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: 0 }).addTo(map);
-                renderLeafletOverlay();
-                updateOpacitySliderVisibility();
             };
             e.target.value = ''; // Reset file selector
         });
+
+        function cancelOverlayPlacement() {
+            isPlacingOverlay = false;
+            document.getElementById('map-instruction-overlay').classList.add('hidden');
+            document.getElementById('map').classList.remove('map-placing-overlay');
+            unloadOverlay();
+        }
 
         function renderLeafletOverlay() {
             if (!leafletImageOverlay || !imgCenter) return;
@@ -1115,6 +1183,11 @@
             activeOverlayId = null;
             activeOverlayImgBlob = null;
             if (activeOverlayBlobUrl) { URL.revokeObjectURL(activeOverlayBlobUrl); activeOverlayBlobUrl = null; }
+            
+            isPlacingOverlay = false;
+            document.getElementById('map-instruction-overlay')?.classList.add('hidden');
+            document.getElementById('map')?.classList.remove('map-placing-overlay');
+            
             renderOverlayList();
             updateOpacitySliderVisibility();
         }
