@@ -287,14 +287,14 @@
             
             <!-- Maps Tab -->
             <div id="drawer-maps" class="p-4">
-                <div class="flex flex-col gap-2" id="base-map-list">
+                <div class="flex flex-col gap-0" id="base-map-list">
                     <!-- Base maps rendered dynamically -->
                 </div>
             </div>
 
             <!-- Points Tab -->
             <div id="drawer-points" class="hidden p-4 flex flex-col h-full overflow-hidden">
-                <div id="marker-list" class="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-2">
+                <div id="marker-list" class="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-0">
                     <div class="text-center text-xs text-gray-500 mt-10">No points added yet.</div>
                 </div>
                 <div class="mt-4 flex gap-2 shrink-0">
@@ -309,7 +309,7 @@
 
             <!-- Overlays Tab -->
             <div id="drawer-overlays" class="hidden p-4 flex flex-col h-full overflow-hidden">
-                <div id="overlay-list" class="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-2">
+                <div id="overlay-list" class="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-0">
                     <div class="text-center text-xs text-gray-500 mt-6">No overlays saved yet.</div>
                 </div>
                 <div class="flex gap-2 mt-4 pt-4 border-t border-gray-100 shrink-0">
@@ -325,8 +325,8 @@
         </div>
         
         <!-- Drawer Footer -->
-        <div class="p-3 border-t border-gray-200 bg-gray-50 flex gap-2 shrink-0">
-            <button onclick="openSettingsModal()" class="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 p-2 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2 font-medium text-sm">
+        <div class="p-3 border-t border-gray-200 bg-white flex gap-2 shrink-0">
+            <button onclick="openSettingsModal()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 p-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 font-medium text-sm">
                 <i data-lucide="settings" class="w-4 h-4"></i> App Settings
             </button>
         </div>
@@ -486,11 +486,14 @@
         let isBottomPanelOpen = false;
         let isPlacingOverlay = false;
         let oldImgCenterBackup = null;
+        let currentDrawerTab = 'maps';
         
         let globalMarkerColor = '#ef4444';
         let globalMarkerShape = 'dot';
         let initialCenter = [51.505, -0.09];
         let initialZoom = null;
+
+        const osZoomOffset = 7.45; // Precise math scaling offset between OS & EPSG3857 zoom curves
 
         // Overlay State
         let overlays = []; // from idb
@@ -546,6 +549,7 @@
             initMap();
             loadMarkersFromStorage();
             await loadOverlaysMeta();
+            setupDrawerSwiping();
             
             lucide.createIcons();
             renderBaseMapsList();
@@ -559,7 +563,8 @@
             const defaultZoom = useOS ? 7 : 10;
             const zoomToSet = initialZoom !== null ? initialZoom : defaultZoom;
             
-            const options = { zoomControl: false, center: initialCenter, zoom: zoomToSet };
+            // Allow precision matching zoom snaps to unify OS and standard maps scaling identicals
+            const options = { zoomControl: false, center: initialCenter, zoom: zoomToSet, zoomSnap: 0.1, zoomDelta: 1 };
             
             if (useOS) {
                 options.crs = osCrs;
@@ -591,14 +596,14 @@
             const zoom = map.getZoom();
             map.remove(); 
             
-            const options = { zoomControl: false, center: center };
+            const options = { zoomControl: false, center: center, zoomSnap: 0.1, zoomDelta: 1 };
             if (useOS) {
                 options.crs = osCrs; options.minZoom = 0; options.maxZoom = 13;
-                options.zoom = Math.max(0, zoom - 7); 
+                options.zoom = Math.max(0, zoom - osZoomOffset); 
                 const tC = arr => proj4('EPSG:27700', 'EPSG:4326', arr).reverse();
                 options.maxBounds = [tC([-238375.0, 0.0]), tC([900000.0, 1376256.0])];
             } else {
-                options.crs = L.CRS.EPSG3857; options.zoom = Math.min(19, zoom + 7);
+                options.crs = L.CRS.EPSG3857; options.zoom = Math.min(19, zoom + osZoomOffset);
             }
             
             map = L.map('map', options);
@@ -681,7 +686,7 @@
             map.on('zoomend', saveMapState);
         }
 
-        // --- Drawer UI ---
+        // --- Drawer UI & Swiping ---
         function toggleDrawer() {
             const drawer = document.getElementById('drawer');
             if (drawer.classList.contains('drawer-closed')) {
@@ -699,6 +704,7 @@
         }
 
         function switchDrawerTab(tabId) {
+            currentDrawerTab = tabId;
             ['maps', 'points', 'overlays'].forEach(id => {
                 const btn = document.getElementById(`tab-${id}`);
                 const content = document.getElementById(`drawer-${id}`);
@@ -711,21 +717,53 @@
                 }
             });
         }
+        
+        function setupDrawerSwiping() {
+            let touchStartX = 0;
+            let touchEndX = 0;
+
+            const drawerEl = document.getElementById('drawer');
+            drawerEl.addEventListener('touchstart', e => {
+                touchStartX = e.changedTouches[0].screenX;
+            }, {passive: true});
+
+            drawerEl.addEventListener('touchend', e => {
+                touchEndX = e.changedTouches[0].screenX;
+                handleDrawerSwipe();
+            }, {passive: true});
+
+            function handleDrawerSwipe() {
+                const swipeThreshold = 60;
+                if (touchEndX < touchStartX - swipeThreshold) {
+                    if (currentDrawerTab === 'maps') switchDrawerTab('points');
+                    else if (currentDrawerTab === 'points') switchDrawerTab('overlays');
+                    else if (currentDrawerTab === 'overlays') closeDrawerIfOpen();
+                }
+                if (touchEndX > touchStartX + swipeThreshold) {
+                    if (currentDrawerTab === 'overlays') switchDrawerTab('points');
+                    else if (currentDrawerTab === 'points') switchDrawerTab('maps');
+                }
+            }
+        }
 
         function renderBaseMapsList() {
             const container = document.getElementById('base-map-list');
             container.innerHTML = baseMapDefs.map(m => {
                 const isActive = m.id === currentMapType;
-                const activeClass = isActive ? 'border-blue-500 bg-blue-50 text-blue-800' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50';
-                const check = isActive ? '<i data-lucide="check-circle-2" class="w-5 h-5 text-blue-600"></i>' : '';
+                const activeClass = isActive ? 'bg-blue-50 rounded-lg' : '';
+                const textClass = isActive ? 'text-blue-800' : 'text-gray-800';
+                const iconClass = isActive ? 'text-blue-600' : 'text-gray-400';
+                const check = isActive ? '<i data-lucide="check" class="w-4 h-4 text-blue-600"></i>' : '';
                 return `
-                    <button onclick="changeBaseMap('${m.id}')" class="flex items-center justify-between p-3 border rounded-xl transition-colors ${activeClass}">
-                        <div class="flex items-center gap-3">
-                            <i data-lucide="${m.icon}" class="w-5 h-5 opacity-70"></i>
-                            <span class="text-sm font-semibold">${m.name}</span>
-                        </div>
-                        ${check}
-                    </button>
+                    <div class="p-2 relative border-b border-gray-100 last:border-0 transition-colors ${activeClass}">
+                        <button onclick="changeBaseMap('${m.id}')" class="w-full flex items-center justify-between transition-colors">
+                            <div class="flex items-center gap-3">
+                                <i data-lucide="${m.icon}" class="w-4 h-4 ${iconClass}"></i>
+                                <span class="text-sm font-bold ${textClass}">${m.name}</span>
+                            </div>
+                            ${check}
+                        </button>
+                    </div>
                 `;
             }).join('');
             lucide.createIcons();
@@ -797,14 +835,19 @@
 
         // --- Bottom Panel General (Points & Overlays) ---
         function animateMapSqueeze(isOpening, targetLatLng = null) {
+            const start = performance.now();
+            const step = () => {
+                map.invalidateSize({ pan: false });
+                if (performance.now() - start < 350) requestAnimationFrame(step);
+            };
+            requestAnimationFrame(step); // Continuously fetch tiles smoothly filling grey space
+
             if (targetLatLng) {
                 setTimeout(() => {
-                    map.invalidateSize({ pan: false });
                     map.flyTo(targetLatLng, map.getZoom(), { animate: true, duration: 0.5 });
                 }, 300);
             } else {
                 map.panBy([0, isOpening ? 190 : -190], { animate: true, duration: 0.3 });
-                setTimeout(() => map.invalidateSize({ pan: false }), 300);
             }
         }
 
@@ -978,7 +1021,7 @@
                     
                     if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
                     const opacity = imgOpacity / 100;
-                    leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation }).addTo(map);
+                    leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: 0 }).addTo(map);
                     renderLeafletOverlay();
                     updateOpacitySliderVisibility();
                 }
@@ -994,6 +1037,8 @@
             document.getElementById('map').classList.remove('map-squeezed');
             document.getElementById('ui-layer').classList.remove('map-squeezed');
             isBottomPanelOpen = false;
+            
+            animateMapSqueeze(false);
             updateOpacitySliderVisibility();
 
             document.getElementById('map-instruction-overlay').classList.remove('hidden');
@@ -1186,9 +1231,9 @@
                     const savedIsOS = data.savedView.hasOwnProperty('isOS') ? data.savedView.isOS : (data.savedView.zoom <= 13 && currentMapType === 'os_combined');
                     
                     if (currentIsOS && !savedIsOS) {
-                        targetZoom = Math.max(0, Math.min(13, targetZoom - 7));
+                        targetZoom = Math.max(0, Math.min(13, targetZoom - osZoomOffset));
                     } else if (!currentIsOS && savedIsOS) {
-                        targetZoom = Math.max(0, Math.min(19, targetZoom + 7));
+                        targetZoom = Math.max(0, Math.min(19, targetZoom + osZoomOffset));
                     }
                     map.setView([data.savedView.lat, data.savedView.lng], targetZoom);
                 } else {
@@ -1214,9 +1259,9 @@
                     const savedIsOS = data.savedView.hasOwnProperty('isOS') ? data.savedView.isOS : (data.savedView.zoom <= 13 && currentMapType === 'os_combined');
                     
                     if (currentIsOS && !savedIsOS) {
-                        targetZoom = Math.max(0, Math.min(13, targetZoom - 7));
+                        targetZoom = Math.max(0, Math.min(13, targetZoom - osZoomOffset));
                     } else if (!currentIsOS && savedIsOS) {
-                        targetZoom = Math.max(0, Math.min(19, targetZoom + 7));
+                        targetZoom = Math.max(0, Math.min(19, targetZoom + osZoomOffset));
                     }
                     map.flyTo([data.savedView.lat, data.savedView.lng], targetZoom);
                 } else if (data.calibration) {
@@ -1747,7 +1792,7 @@
         function handleOrientation(event) {
             let heading = null;
             if (event.webkitCompassHeading) heading = event.webkitCompassHeading;
-            else if (event.absolute && event.alpha !== null) heading = 360 - event.alpha;
+            else if (event.alpha !== null) heading = 360 - event.alpha;
             if (heading !== null) { deviceHeading = heading; updateHeadingUI(); }
         }
 
@@ -1841,6 +1886,16 @@
             document.getElementById('nav-bar').classList.add('-translate-y-full');
             if (navPolyline) { map.removeLayer(navPolyline); navPolyline = null; }
             renderMarkerList();
+        }
+
+        function calculateBearing(lat1, lon1, lat2, lon2) {
+            const toRad = deg => deg * Math.PI / 180;
+            const toDeg = rad => rad * 180 / Math.PI;
+            const dLon = toRad(lon2 - lon1);
+            lat1 = toRad(lat1); lat2 = toRad(lat2);
+            const y = Math.sin(dLon) * Math.cos(lat2);
+            const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+            return (toDeg(Math.atan2(y, x)) + 360) % 360;
         }
 
         // --- Settings Management ---
