@@ -110,9 +110,7 @@
             <div class="flex items-center space-x-3">
                 <button onclick="openCompassModal()" class="bg-gray-900 w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-800 transition-colors cursor-pointer shrink-0">
                     <div id="nav-compass-container" class="transition-transform duration-200 ease-out w-5 h-5 text-blue-400">
-                        <svg viewBox="0 0 24 24" class="w-full h-full fill-current drop-shadow-sm" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polygon points="12 2 19 21 12 17 5 21 12 2" />
-                        </svg>
+                        <svg viewBox="0 0 24 24" class="w-full h-full fill-current drop-shadow-sm" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2" /></svg>
                     </div>
                 </button>
                 <div>
@@ -483,6 +481,7 @@
         let orientationRequested = false;
         let currentNavRotation = 0; 
         let currentDialRotation = 0; 
+        let currentUserRotation = 0;
         let isBottomPanelOpen = false;
         let isPlacingOverlay = false;
         
@@ -1083,7 +1082,8 @@
                 savedView: {
                     lat: map.getCenter().lat,
                     lng: map.getCenter().lng,
-                    zoom: map.getZoom()
+                    zoom: map.getZoom(),
+                    isOS: (currentMapType === 'os_combined')
                 }
             };
 
@@ -1147,9 +1147,18 @@
                 renderLeafletOverlay();
                 syncOpacitySlider();
                 
-                // Re-center map back to saved perspective if available
+                // Re-center map back to saved perspective if available, adjusting zoom level between CRS projections
                 if (data.savedView) {
-                    map.setView([data.savedView.lat, data.savedView.lng], data.savedView.zoom);
+                    let targetZoom = data.savedView.zoom;
+                    const currentIsOS = (currentMapType === 'os_combined');
+                    const savedIsOS = data.savedView.hasOwnProperty('isOS') ? data.savedView.isOS : (data.savedView.zoom <= 13 && currentMapType === 'os_combined');
+                    
+                    if (currentIsOS && !savedIsOS) {
+                        targetZoom = Math.max(0, Math.min(13, targetZoom - 6));
+                    } else if (!currentIsOS && savedIsOS) {
+                        targetZoom = Math.max(0, Math.min(19, targetZoom + 6));
+                    }
+                    map.setView([data.savedView.lat, data.savedView.lng], targetZoom);
                 } else {
                     map.flyTo(imgCenter, Math.max(map.getZoom(), 14));
                 }
@@ -1166,9 +1175,18 @@
                 const data = await idbKeyval.get(id);
                 if (!data) return;
                 
-                // Switch focus map view back to saved perspective coordinates
+                // Switch focus map view back to saved perspective coordinates, adjusting zoom levels for CRS projections
                 if (data.savedView) {
-                    map.flyTo([data.savedView.lat, data.savedView.lng], data.savedView.zoom);
+                    let targetZoom = data.savedView.zoom;
+                    const currentIsOS = (currentMapType === 'os_combined');
+                    const savedIsOS = data.savedView.hasOwnProperty('isOS') ? data.savedView.isOS : (data.savedView.zoom <= 13 && currentMapType === 'os_combined');
+                    
+                    if (currentIsOS && !savedIsOS) {
+                        targetZoom = Math.max(0, Math.min(13, targetZoom - 6));
+                    } else if (!currentIsOS && savedIsOS) {
+                        targetZoom = Math.max(0, Math.min(19, targetZoom + 6));
+                    }
+                    map.flyTo([data.savedView.lat, data.savedView.lng], targetZoom);
                 } else if (data.calibration) {
                     map.flyTo([data.calibration.lat, data.calibration.lng], Math.max(map.getZoom(), 14));
                 }
@@ -1703,9 +1721,16 @@
 
         function updateHeadingUI() {
             const headingContainer = document.getElementById('user-heading-container');
-            if (headingContainer) {
+            if (headingContainer && deviceHeading !== null && !isNaN(deviceHeading)) {
                 headingContainer.style.display = 'block';
-                headingContainer.style.transform = `rotate(${deviceHeading}deg)`;
+                
+                // Continuous accumulated transition calculations (Shortest Angular Path)
+                let delta = deviceHeading - (currentUserRotation % 360);
+                if (delta > 180) delta -= 360;
+                if (delta < -180) delta += 360;
+                currentUserRotation += delta;
+                
+                headingContainer.style.transform = `rotate(${currentUserRotation}deg)`;
             }
             if (navigatingToId) updateNavigationCompass();
         }
