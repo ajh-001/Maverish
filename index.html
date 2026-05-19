@@ -239,11 +239,16 @@
                         </div>
                     </div>
 
-                    <!-- Image Replace -->
-                    <label class="w-full flex items-center justify-center gap-2 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-bold py-2.5 rounded-lg transition text-center shadow-sm cursor-pointer">
-                        <i data-lucide="image" class="w-4 h-4"></i> Replace Image File
-                        <input type="file" id="overlay-file-input" class="hidden" accept="image/*">
-                    </label>
+                    <!-- Image Modification Options -->
+                    <div class="flex gap-2 w-full">
+                        <label class="flex-1 flex items-center justify-center gap-2 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-bold py-2.5 rounded-lg transition text-center shadow-sm cursor-pointer">
+                            <i data-lucide="image" class="w-4 h-4"></i> Change Image File
+                            <input type="file" id="overlay-file-input" class="hidden" accept="image/*">
+                        </label>
+                        <button type="button" onclick="triggerOverlayReselect()" class="flex-1 flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 text-xs font-bold py-2.5 rounded-lg transition text-center shadow-sm">
+                            <i data-lucide="crosshair" class="w-4 h-4"></i> Reselect Center
+                        </button>
+                    </div>
 
                 </div>
             </div>
@@ -281,8 +286,7 @@
         <div class="flex-1 overflow-y-auto no-scrollbar relative bg-white">
             
             <!-- Maps Tab -->
-            <div id="drawer-maps" class="p-4 flex flex-col gap-3">
-                <p class="text-xs text-gray-500 mb-1 font-semibold uppercase tracking-wider">Select Base Map</p>
+            <div id="drawer-maps" class="p-4">
                 <div class="flex flex-col gap-2" id="base-map-list">
                     <!-- Base maps rendered dynamically -->
                 </div>
@@ -290,9 +294,6 @@
 
             <!-- Points Tab -->
             <div id="drawer-points" class="hidden p-4 flex flex-col h-full overflow-hidden">
-                <div class="flex justify-between items-center mb-3">
-                    <p class="text-xs text-gray-500 font-semibold uppercase tracking-wider">Saved Locations</p>
-                </div>
                 <div id="marker-list" class="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-2">
                     <div class="text-center text-xs text-gray-500 mt-10">No points added yet.</div>
                 </div>
@@ -484,6 +485,7 @@
         let currentUserRotation = 0;
         let isBottomPanelOpen = false;
         let isPlacingOverlay = false;
+        let oldImgCenterBackup = null;
         
         let globalMarkerColor = '#ef4444';
         let globalMarkerShape = 'dot';
@@ -592,11 +594,11 @@
             const options = { zoomControl: false, center: center };
             if (useOS) {
                 options.crs = osCrs; options.minZoom = 0; options.maxZoom = 13;
-                options.zoom = Math.max(0, zoom - 6); 
+                options.zoom = Math.max(0, zoom - 7); 
                 const tC = arr => proj4('EPSG:27700', 'EPSG:4326', arr).reverse();
                 options.maxBounds = [tC([-238375.0, 0.0]), tC([900000.0, 1376256.0])];
             } else {
-                options.crs = L.CRS.EPSG3857; options.zoom = Math.min(19, zoom + 6);
+                options.crs = L.CRS.EPSG3857; options.zoom = Math.min(19, zoom + 7);
             }
             
             map = L.map('map', options);
@@ -621,7 +623,7 @@
             // Re-attach Overlay
             if (activeOverlayImgBlob) {
                 const opacity = imgOpacity / 100;
-                leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: 0 }).addTo(map);
+                leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation }).addTo(map);
                 renderLeafletOverlay();
             }
         }
@@ -638,19 +640,23 @@
                     document.getElementById('map').classList.remove('map-placing-overlay');
                     
                     imgCenter = e.latlng;
-                    imgRotation = 0;
-                    imgOpacity = parseInt(document.getElementById('floating-opacity-slider').value) || 60;
-                    const aspect = calImgObj.naturalWidth / calImgObj.naturalHeight;
-                    const mapBounds = map.getBounds();
-                    imgWidthLng = (mapBounds.getEast() - mapBounds.getWest()) * 0.4; 
-                    imgHeightLat = (imgWidthLng * Math.cos(imgCenter.lat * Math.PI / 180)) / aspect;
+                    
+                    // Automatically calculate scale boundaries ONLY on fresh, unscaled placement (imgWidthLng = 0)
+                    if (imgWidthLng === 0) {
+                        imgRotation = 0;
+                        imgOpacity = parseInt(document.getElementById('floating-opacity-slider').value) || 60;
+                        const aspect = calImgObj.naturalWidth / calImgObj.naturalHeight;
+                        const mapBounds = map.getBounds();
+                        imgWidthLng = (mapBounds.getEast() - mapBounds.getWest()) * 0.4; 
+                        imgHeightLat = (imgWidthLng * Math.cos(imgCenter.lat * Math.PI / 180)) / aspect;
+                    }
                     
                     if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
                     const opacity = imgOpacity / 100;
-                    leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: 0 }).addTo(map);
+                    leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation }).addTo(map);
                     renderLeafletOverlay();
                     
-                    setupPanelUI('overlay', '');
+                    setupPanelUI('overlay', document.getElementById('edit-item-id').value);
                     animateMapSqueeze(true);
                     updateOpacitySliderVisibility();
                 }
@@ -765,7 +771,7 @@
 
             const modal = document.getElementById(id);
             modal.classList.remove('hidden');
-            if (id === 'add-menu-modal') modal.style.display = 'flex'; // Uses flex col 
+            if (id === 'add-menu-modal') modal.style.display = 'flex'; 
             else modal.style.display = 'flex';
             
             lucide.createIcons();
@@ -833,7 +839,7 @@
             animateMapSqueeze(true);
             
             if (type === 'overlay') {
-                // Trigger file input immediately if new overlay
+                imgWidthLng = 0; // Force recalculation bounds for fresh placements
                 document.getElementById('overlay-file-input').click();
             }
             updateOpacitySliderVisibility();
@@ -878,7 +884,7 @@
                     delBtn.onclick = () => confirmDeleteMarker(editId);
                     
                     tempPickedCoords = { lat: m.lat, lng: m.lng };
-                    document.getElementById('coord-format').value = 'map';
+                    document.getElementById('coord-format').value = 'dd'; // Safer format on edit so pan doesn't snap
                     document.getElementById('picked-coords-display').innerText = `${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}`;
                     document.getElementById('dd-lat').value = m.lat.toFixed(6);
                     document.getElementById('dd-lng').value = m.lng.toFixed(6);
@@ -952,7 +958,8 @@
             calImgObj.src = activeOverlayBlobUrl;
             calImgObj.onload = () => {
                 const isNew = !document.getElementById('edit-item-id').value;
-                if (isNew) {
+                if (isNew || imgWidthLng === 0) {
+                    imgWidthLng = 0; 
                     isPlacingOverlay = true;
                     
                     // Temporarily hide the panel to give a full view for placement
@@ -971,7 +978,7 @@
                     
                     if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
                     const opacity = imgOpacity / 100;
-                    leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: 0 }).addTo(map);
+                    leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation }).addTo(map);
                     renderLeafletOverlay();
                     updateOpacitySliderVisibility();
                 }
@@ -979,11 +986,36 @@
             e.target.value = ''; // Reset file selector
         });
 
+        function triggerOverlayReselect() {
+            oldImgCenterBackup = L.latLng(imgCenter.lat, imgCenter.lng);
+            isPlacingOverlay = true;
+            
+            document.getElementById('bottom-panel').classList.replace('panel-open', 'panel-closed');
+            document.getElementById('map').classList.remove('map-squeezed');
+            document.getElementById('ui-layer').classList.remove('map-squeezed');
+            isBottomPanelOpen = false;
+            updateOpacitySliderVisibility();
+
+            document.getElementById('map-instruction-overlay').classList.remove('hidden');
+            document.getElementById('map').classList.add('map-placing-overlay');
+            lucide.createIcons();
+        }
+
         function cancelOverlayPlacement() {
             isPlacingOverlay = false;
             document.getElementById('map-instruction-overlay').classList.add('hidden');
             document.getElementById('map').classList.remove('map-placing-overlay');
-            unloadOverlay();
+            
+            const editId = document.getElementById('edit-item-id').value;
+            if (!editId || imgWidthLng === 0) {
+                unloadOverlay();
+            } else {
+                if (oldImgCenterBackup) imgCenter = L.latLng(oldImgCenterBackup.lat, oldImgCenterBackup.lng);
+                renderLeafletOverlay();
+                setupPanelUI('overlay', editId);
+                animateMapSqueeze(true);
+                updateOpacitySliderVisibility();
+            }
         }
 
         function renderLeafletOverlay() {
@@ -1154,9 +1186,9 @@
                     const savedIsOS = data.savedView.hasOwnProperty('isOS') ? data.savedView.isOS : (data.savedView.zoom <= 13 && currentMapType === 'os_combined');
                     
                     if (currentIsOS && !savedIsOS) {
-                        targetZoom = Math.max(0, Math.min(13, targetZoom - 6));
+                        targetZoom = Math.max(0, Math.min(13, targetZoom - 7));
                     } else if (!currentIsOS && savedIsOS) {
-                        targetZoom = Math.max(0, Math.min(19, targetZoom + 6));
+                        targetZoom = Math.max(0, Math.min(19, targetZoom + 7));
                     }
                     map.setView([data.savedView.lat, data.savedView.lng], targetZoom);
                 } else {
@@ -1182,9 +1214,9 @@
                     const savedIsOS = data.savedView.hasOwnProperty('isOS') ? data.savedView.isOS : (data.savedView.zoom <= 13 && currentMapType === 'os_combined');
                     
                     if (currentIsOS && !savedIsOS) {
-                        targetZoom = Math.max(0, Math.min(13, targetZoom - 6));
+                        targetZoom = Math.max(0, Math.min(13, targetZoom - 7));
                     } else if (!currentIsOS && savedIsOS) {
-                        targetZoom = Math.max(0, Math.min(19, targetZoom + 6));
+                        targetZoom = Math.max(0, Math.min(19, targetZoom + 7));
                     }
                     map.flyTo([data.savedView.lat, data.savedView.lng], targetZoom);
                 } else if (data.calibration) {
@@ -1809,16 +1841,6 @@
             document.getElementById('nav-bar').classList.add('-translate-y-full');
             if (navPolyline) { map.removeLayer(navPolyline); navPolyline = null; }
             renderMarkerList();
-        }
-
-        function calculateBearing(lat1, lon1, lat2, lon2) {
-            const toRad = deg => deg * Math.PI / 180;
-            const toDeg = rad => rad * 180 / Math.PI;
-            const dLon = toRad(lon2 - lon1);
-            lat1 = toRad(lat1); lat2 = toRad(lat2);
-            const y = Math.sin(dLon) * Math.cos(lat2);
-            const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-            return (toDeg(Math.atan2(y, x)) + 360) % 360;
         }
 
         // --- Settings Management ---
