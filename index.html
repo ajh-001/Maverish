@@ -58,14 +58,6 @@
         }
 
         .pointer-events-auto { pointer-events: auto; }
-
-        #nav-compass-container,
-        #large-compass-container,
-        #large-compass-dial {
-            will-change: transform;
-            backface-visibility: hidden;
-            transform-style: preserve-3d;
-        }
         
         /* Drawer & Panel transitions */
         .drawer-open { transform: translateX(0%); }
@@ -276,7 +268,7 @@
         <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0">
             <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <i data-lucide="map" class="w-5 h-5 text-blue-600"></i>
-                Maverish test2
+                Maverish test3
             </h1>
             <button onclick="toggleDrawer()" class="p-2 text-gray-500 hover:text-gray-800 rounded-md">
                 <i data-lucide="x" class="w-5 h-5"></i>
@@ -488,10 +480,6 @@
         let deviceHeading = null;
         let navTargetBearing = null;
         let orientationRequested = false;
-        let currentNavRotation = 0; 
-        let currentDialRotation = 0; 
-        let smoothedDeviceHeading = null;
-        let lastOrientationUpdate = 0;
         let isBottomPanelOpen = false;
         let isPlacingOverlay = false;
         let oldImgCenterBackup = null;
@@ -501,8 +489,8 @@
         let globalMarkerShape = 'dot';
         let initialCenter = [51.505, -0.09];
         let initialZoom = 10;
-
-        // Overlay State
+        
+        // --- Overlays State ---
         let overlays = []; // from idb
         let activeOverlayId = null;
         let activeOverlayImgBlob = null;
@@ -634,17 +622,6 @@
                 leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation }).addTo(map);
                 renderLeafletOverlay();
             }
-
-            map.fitBounds(bounds, { animate: false, padding: [0, 0] });
-
-            const mapSelector = document.getElementById('map-layer-select');
-            if (mapSelector) mapSelector.value = currentMapType;
-
-            if (navPolyline) navPolyline.bringToFront();
-            if (userPosMarker) userPosMarker.bringToFront();
-            markers.forEach(m => {
-                if (m.leafletMarker && m.isVisible) m.leafletMarker.bringToFront();
-            });
         }
 
         // --- Map Setup ---
@@ -695,10 +672,7 @@
                     document.getElementById('dd-lng').value = center.lng.toFixed(6);
                     syncCoords('dd');
                 }
-                const mapSelector = document.getElementById('map-layer-select');
-            if (mapSelector) mapSelector.value = currentMapType;
-
-            saveMapState();
+                saveMapState();
             });
             map.on('zoomend', saveMapState);
         }
@@ -808,9 +782,6 @@
                     }
                 });
                 mapLayers[newId].addTo(map);
-
-                if (navPolyline) navPolyline.bringToFront();
-                if (leafletImageOverlay) leafletImageOverlay.bringToFront();
             }
             saveMapState();
             renderBaseMapsList();
@@ -955,7 +926,7 @@
                     delBtn.onclick = () => confirmDeleteMarker(editId);
                     
                     tempPickedCoords = { lat: m.lat, lng: m.lng };
-                    document.getElementById('coord-format').value = 'dd'; // Set DD (Degrees) by default on Edit
+                    document.getElementById('coord-format').value = 'dd'; // Safer format on edit so pan doesn't snap
                     document.getElementById('picked-coords-display').innerText = `${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}`;
                     document.getElementById('dd-lat').value = m.lat.toFixed(6);
                     document.getElementById('dd-lng').value = m.lng.toFixed(6);
@@ -1252,7 +1223,7 @@
                 renderLeafletOverlay();
                 syncOpacitySlider();
                 
-                // Re-center map back to saved perspective if available, adjusting zoom level between CRS projections
+                // Re-center map back to saved perspective if available
                 if (data.savedView) {
                     let targetZoom = data.savedView.zoom;
                     const currentIsOS = (currentMapType === 'os_combined');
@@ -1280,7 +1251,7 @@
                 const data = await idbKeyval.get(id);
                 if (!data) return;
                 
-                // Switch focus map view back to saved perspective coordinates, adjusting zoom levels for CRS projections
+                // Switch focus map view back to saved perspective coordinates
                 if (data.savedView) {
                     let targetZoom = data.savedView.zoom;
                     const currentIsOS = (currentMapType === 'os_combined');
@@ -1816,58 +1787,25 @@
             }
         }
 
-        function normalizeAngle(angle) {
-            return ((angle % 360) + 360) % 360;
-        }
-
-        function smallestAngleDiff(a, b) {
-            return ((b - a + 540) % 360) - 180;
-        }
-
         function handleOrientation(event) {
-            const now = performance.now();
-
-            // Limit update frequency slightly without adding visible lag
-            if (now - lastOrientationUpdate < 60) return;
-
             let heading = null;
-
-            if (typeof event.webkitCompassHeading === 'number') {
-                heading = event.webkitCompassHeading;
-            } else if (event.absolute && typeof event.alpha === 'number') {
-                heading = 360 - event.alpha;
-            }
-
-            if (heading === null || isNaN(heading)) return;
-
-            heading = normalizeAngle(heading);
-
-            // First reading
-            if (smoothedDeviceHeading === null) {
-                smoothedDeviceHeading = heading;
-            } else {
-                const delta = smallestAngleDiff(smoothedDeviceHeading, heading);
-
-                // Ignore tiny sensor jitter entirely when stationary
-                if (Math.abs(delta) < 1.2) return;
-
-                // Gentle low-pass filter similar to the older draft behaviour
-                smoothedDeviceHeading = normalizeAngle(
-                    smoothedDeviceHeading + (delta * 0.14)
-                );
-            }
-
-            deviceHeading = smoothedDeviceHeading;
-            lastOrientationUpdate = now;
-
-            updateHeadingUI();
+            if (event.webkitCompassHeading) heading = event.webkitCompassHeading;
+            else if (event.alpha !== null) heading = 360 - event.alpha;
+            if (heading !== null) { deviceHeading = heading; updateHeadingUI(); }
         }
 
         function updateHeadingUI() {
             const headingContainer = document.getElementById('user-heading-container');
             if (headingContainer && deviceHeading !== null && !isNaN(deviceHeading)) {
                 headingContainer.style.display = 'block';
-                headingContainer.style.transform = `rotate(${deviceHeading}deg)`;
+                
+                // Continuous accumulated transition calculations (Shortest Angular Path)
+                let delta = deviceHeading - (currentUserRotation % 360);
+                if (delta > 180) delta -= 360;
+                if (delta < -180) delta += 360;
+                currentUserRotation += delta;
+                
+                headingContainer.style.transform = `rotate(${currentUserRotation}deg)`;
             }
             if (navigatingToId) updateNavigationCompass();
         }
@@ -1924,9 +1862,21 @@
                 dialRotation = -userPos.heading;
             }
             
-            if (compContainer) compContainer.style.transform = `rotate(${targetRotation}deg)`;
-            if (largeCompContainer) largeCompContainer.style.transform = `rotate(${targetRotation}deg)`;
-            if (dialContainer) dialContainer.style.transform = `rotate(${dialRotation}deg)`;
+            let delta = targetRotation - (currentNavRotation % 360);
+            if (delta > 180) delta -= 360;
+            if (delta < -180) delta += 360;
+            currentNavRotation += delta;
+            
+            compContainer.style.transform = `rotate(${currentNavRotation}deg)`;
+            if (largeCompContainer) largeCompContainer.style.transform = `rotate(${currentNavRotation}deg)`;
+            
+            if (dialContainer) {
+                let dialDelta = dialRotation - (currentDialRotation % 360);
+                if (dialDelta > 180) dialDelta -= 360;
+                if (dialDelta < -180) dialDelta += 360;
+                currentDialRotation += dialDelta;
+                dialContainer.style.transform = `rotate(${currentDialRotation}deg)`;
+            }
         }
 
         function stopNavigation() {
