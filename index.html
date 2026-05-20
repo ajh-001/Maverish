@@ -62,8 +62,9 @@
         #nav-compass-container,
         #large-compass-container,
         #large-compass-dial {
-            transition: transform 0.18s linear;
             will-change: transform;
+            backface-visibility: hidden;
+            transform-style: preserve-3d;
         }
         
         /* Drawer & Panel transitions */
@@ -275,7 +276,7 @@
         <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0">
             <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <i data-lucide="map" class="w-5 h-5 text-blue-600"></i>
-                Maverish test
+                Maverish test2
             </h1>
             <button onclick="toggleDrawer()" class="p-2 text-gray-500 hover:text-gray-800 rounded-md">
                 <i data-lucide="x" class="w-5 h-5"></i>
@@ -636,6 +637,9 @@
 
             map.fitBounds(bounds, { animate: false, padding: [0, 0] });
 
+            const mapSelector = document.getElementById('map-layer-select');
+            if (mapSelector) mapSelector.value = currentMapType;
+
             if (navPolyline) navPolyline.bringToFront();
             if (userPosMarker) userPosMarker.bringToFront();
             markers.forEach(m => {
@@ -691,7 +695,10 @@
                     document.getElementById('dd-lng').value = center.lng.toFixed(6);
                     syncCoords('dd');
                 }
-                saveMapState();
+                const mapSelector = document.getElementById('map-layer-select');
+            if (mapSelector) mapSelector.value = currentMapType;
+
+            saveMapState();
             });
             map.on('zoomend', saveMapState);
         }
@@ -1813,31 +1820,43 @@
             return ((angle % 360) + 360) % 360;
         }
 
-        function smoothHeading(previous, next, factor = 0.18) {
-            if (previous === null || isNaN(previous)) return normalizeAngle(next);
-            let delta = normalizeAngle(next - previous);
-            if (delta > 180) delta -= 360;
-            return normalizeAngle(previous + (delta * factor));
+        function smallestAngleDiff(a, b) {
+            return ((b - a + 540) % 360) - 180;
         }
 
         function handleOrientation(event) {
             const now = performance.now();
-            if (now - lastOrientationUpdate < 40) return;
+
+            // Limit update frequency slightly without adding visible lag
+            if (now - lastOrientationUpdate < 60) return;
 
             let heading = null;
 
             if (typeof event.webkitCompassHeading === 'number') {
                 heading = event.webkitCompassHeading;
-            } else if (event.absolute === true && typeof event.alpha === 'number') {
-                heading = 360 - event.alpha;
-            } else if (typeof event.alpha === 'number') {
+            } else if (event.absolute && typeof event.alpha === 'number') {
                 heading = 360 - event.alpha;
             }
 
             if (heading === null || isNaN(heading)) return;
 
             heading = normalizeAngle(heading);
-            smoothedDeviceHeading = smoothHeading(smoothedDeviceHeading, heading);
+
+            // First reading
+            if (smoothedDeviceHeading === null) {
+                smoothedDeviceHeading = heading;
+            } else {
+                const delta = smallestAngleDiff(smoothedDeviceHeading, heading);
+
+                // Ignore tiny sensor jitter entirely when stationary
+                if (Math.abs(delta) < 1.2) return;
+
+                // Gentle low-pass filter similar to the older draft behaviour
+                smoothedDeviceHeading = normalizeAngle(
+                    smoothedDeviceHeading + (delta * 0.14)
+                );
+            }
+
             deviceHeading = smoothedDeviceHeading;
             lastOrientationUpdate = now;
 
