@@ -268,7 +268,7 @@
         <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0">
             <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <i data-lucide="map" class="w-5 h-5 text-blue-600"></i>
-                Maverish x1
+                Maverish Maps
             </h1>
             <button onclick="toggleDrawer()" class="p-2 text-gray-500 hover:text-gray-800 rounded-md">
                 <i data-lucide="x" class="w-5 h-5"></i>
@@ -476,6 +476,7 @@
         // --- Core Configuration & State ---
         const osApiKey = 'VEAc2NZ4i1s6qDeC5D5H6S77PG72TrgW'; 
         let map, userPosMarker, navPolyline;
+        let currentBaseLayer = null;
         
         let markers = []; // { id, name, lat, lng, isVisible, leafletMarker }
         let navigatingToId = null;
@@ -496,7 +497,7 @@
         
         let globalMarkerColor = '#ef4444';
         let globalMarkerShape = 'dot';
-        let globalNavColor = '#2563eb'; // Default Blue
+        let globalNavColor = '#2563eb'; // Default tailwind blue
         let initialCenter = [51.505, -0.09];
         let initialZoom = 10;
 
@@ -563,19 +564,6 @@
             updateOpacitySliderVisibility();
         }
 
-        function createCustomPanes() {
-            if (map) {
-                if (!map.getPane('navPaneCustom')) {
-                    map.createPane('navPaneCustom');
-                    map.getPane('navPaneCustom').style.zIndex = '650';
-                }
-                if (!map.getPane('overlayPaneCustom')) {
-                    map.createPane('overlayPaneCustom');
-                    map.getPane('overlayPaneCustom').style.zIndex = '450';
-                }
-            }
-        }
-
         function initMap() {
             const useOS = currentMapType === 'os_combined';
             const options = { zoomControl: false, center: initialCenter, zoom: initialZoom };
@@ -592,10 +580,14 @@
             
             map = L.map('map', options);
             L.control.zoom({ position: 'topright' }).addTo(map);
-            createCustomPanes();
             
-            if (useOS) osCombinedGroup.addTo(map);
-            else mapLayers[currentMapType].addTo(map);
+            // Clean active base layer tracking
+            if (useOS) {
+                currentBaseLayer = osCombinedGroup;
+            } else {
+                currentBaseLayer = mapLayers[currentMapType];
+            }
+            currentBaseLayer.addTo(map);
 
             initUserMarker();
             initCompassTicks();
@@ -623,10 +615,14 @@
             
             map = L.map('map', options);
             L.control.zoom({ position: 'topright' }).addTo(map);
-            createCustomPanes();
             
-            if (useOS) osCombinedGroup.addTo(map);
-            else mapLayers[currentMapType].addTo(map);
+            // Clean active base layer tracking
+            if (useOS) {
+                currentBaseLayer = osCombinedGroup;
+            } else {
+                currentBaseLayer = mapLayers[currentMapType];
+            }
+            currentBaseLayer.addTo(map);
             
             setupMapListeners(); 
             initUserMarker();
@@ -637,18 +633,16 @@
             });
             
             if (navigatingToId) {
-                navPolyline = L.polyline([], { color: globalNavColor, weight: 3, dashArray: '10, 10', pane: 'navPaneCustom' }).addTo(map);
+                navPolyline = L.polyline([], { color: globalNavColor, weight: 3, dashArray: '10, 10' }).addTo(map);
                 updateNavigation();
             }
 
-            // Re-attach Overlay
             if (activeOverlayImgBlob) {
                 const opacity = imgOpacity / 100;
-                leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation, pane: 'overlayPaneCustom' }).addTo(map);
+                leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation }).addTo(map);
                 renderLeafletOverlay();
             }
 
-            // Guarantee polyline is safely drawn on top of the newly generated base tiles
             if (navPolyline) navPolyline.bringToFront();
         }
 
@@ -677,7 +671,7 @@
                     
                     if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
                     const opacity = imgOpacity / 100;
-                    leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation, pane: 'overlayPaneCustom' }).addTo(map);
+                    leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation }).addTo(map);
                     renderLeafletOverlay();
                     
                     setupPanelUI('overlay', document.getElementById('edit-item-id').value);
@@ -802,17 +796,19 @@
             const wasOS = currentMapType === 'os_combined';
             currentMapType = newId;
             
-            if (isOS !== wasOS) rebuildMap(isOS);
-            else {
-                map.eachLayer(layer => {
-                    if (layer !== userPosMarker && layer !== navPolyline && layer !== leafletImageOverlay && !markers.some(m => m.leafletMarker === layer)) {
-                        map.removeLayer(layer);
-                    }
-                });
-                mapLayers[newId].addTo(map);
+            if (isOS !== wasOS) {
+                rebuildMap(isOS);
+            } else {
+                // Ensure layer is removed properly before adding new one
+                if (currentBaseLayer && map.hasLayer(currentBaseLayer)) {
+                    map.removeLayer(currentBaseLayer);
+                }
+                currentBaseLayer = mapLayers[newId];
+                currentBaseLayer.addTo(map);
                 
-                // Guarantee polyline is safely drawn on top of the newly generated base tiles without rebuilds
+                // Keep active items on top
                 if (navPolyline) navPolyline.bringToFront();
+                if (leafletImageOverlay) leafletImageOverlay.bringToFront();
             }
             saveMapState();
             renderBaseMapsList();
@@ -870,7 +866,7 @@
                 map.invalidateSize({ pan: false });
                 if (performance.now() - start < 350) requestAnimationFrame(step);
             };
-            requestAnimationFrame(step); // Continuously fetch tiles smoothly filling grey space
+            requestAnimationFrame(step); 
 
             if (targetLatLng) {
                 setTimeout(() => {
@@ -912,7 +908,7 @@
             animateMapSqueeze(true);
             
             if (type === 'overlay') {
-                imgWidthLng = 0; // Force recalculation bounds for fresh placements
+                imgWidthLng = 0; 
                 document.getElementById('overlay-file-input').click();
             }
             updateOpacitySliderVisibility();
@@ -921,6 +917,10 @@
         function openPanelForEdit(type, id) {
             if (window.innerWidth < 768) closeDrawerIfOpen();
             setupPanelUI(type, id);
+            
+            // Pauses tracking when jumping map
+            isAutoCentering = false;
+            updateCenterButtonUI();
             
             if (type === 'point') {
                 const m = markers.find(x => x.id === id);
@@ -957,7 +957,7 @@
                     delBtn.onclick = () => confirmDeleteMarker(editId);
                     
                     tempPickedCoords = { lat: m.lat, lng: m.lng };
-                    document.getElementById('coord-format').value = 'dd'; // Set DD (Degrees) by default on Edit
+                    document.getElementById('coord-format').value = 'dd'; // DD safely stops pan snatching
                     document.getElementById('picked-coords-display').innerText = `${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}`;
                     document.getElementById('dd-lat').value = m.lat.toFixed(6);
                     document.getElementById('dd-lng').value = m.lng.toFixed(6);
@@ -1051,7 +1051,7 @@
                     
                     if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
                     const opacity = imgOpacity / 100;
-                    leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: 0, pane: 'overlayPaneCustom' }).addTo(map);
+                    leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation }).addTo(map);
                     renderLeafletOverlay();
                     updateOpacitySliderVisibility();
                 }
@@ -1220,10 +1220,9 @@
 
         async function activateOverlay(id) {
             try {
-                // Safeguard navigation and override active GPS tracking focus
                 isAutoCentering = false;
                 updateCenterButtonUI();
-
+                
                 const data = await idbKeyval.get(id);
                 if (!data) return;
 
@@ -1232,7 +1231,6 @@
 
                 activeOverlayId = id;
                 
-                // Backwards-compatible load mechanism (ArrayBuffer fallback to legacy Blob storage)
                 let blob;
                 if (data.imageBuffer) {
                     blob = new Blob([data.imageBuffer], { type: data.imageType || 'image/jpeg' });
@@ -1254,11 +1252,11 @@
                 calImgObj = new Image();
                 calImgObj.src = activeOverlayBlobUrl;
 
-                leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity: imgOpacity/100, interactive: false, angle: imgRotation, pane: 'overlayPaneCustom' }).addTo(map);
+                leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity: imgOpacity/100, interactive: false, angle: imgRotation }).addTo(map);
                 renderLeafletOverlay();
                 syncOpacitySlider();
                 
-                // Re-center map back to saved perspective if available, adjusting zoom level between CRS projections
+                // Re-center map back to saved perspective if available
                 if (data.savedView) {
                     let targetZoom = data.savedView.zoom;
                     const currentIsOS = (currentMapType === 'os_combined');
@@ -1283,14 +1281,13 @@
 
         async function centerOnOverlay(id) {
             try {
-                // Safeguard navigation and override active GPS tracking focus
                 isAutoCentering = false;
                 updateCenterButtonUI();
-
+                
                 const data = await idbKeyval.get(id);
                 if (!data) return;
                 
-                // Switch focus map view back to saved perspective coordinates, adjusting zoom levels for CRS projections
+                // Switch focus map view back to saved perspective coordinates
                 if (data.savedView) {
                     let targetZoom = data.savedView.zoom;
                     const currentIsOS = (currentMapType === 'os_combined');
@@ -1524,7 +1521,6 @@
         }
 
         function centerOnMarker(id) {
-            // Safeguard navigation and override active GPS tracking focus
             isAutoCentering = false;
             updateCenterButtonUI();
 
@@ -1863,7 +1859,7 @@
             document.getElementById('nav-bar').classList.remove('-translate-y-full');
             
             if (window.innerWidth < 768) closeDrawerIfOpen();
-            if (!navPolyline) navPolyline = L.polyline([], { color: globalNavColor, weight: 3, dashArray: '10, 10', pane: 'navPaneCustom' }).addTo(map);
+            if (!navPolyline) navPolyline = L.polyline([], { color: globalNavColor, weight: 3, dashArray: '10, 10' }).addTo(map);
             updateNavigation();
             
             const bounds = L.latLngBounds([userPos.lat, userPos.lng], [m.lat, m.lng]);
