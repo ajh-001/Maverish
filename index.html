@@ -109,7 +109,7 @@
         <div id="nav-bar" class="bg-gray-700 text-white shadow-lg p-3 flex items-center justify-between transform -translate-y-full transition-transform duration-300 pointer-events-auto relative z-10">
             <div class="flex items-center space-x-3">
                 <button onclick="openCompassModal()" class="bg-gray-900 w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-800 transition-colors cursor-pointer shrink-0">
-                    <div id="nav-compass-container" class="transition-transform duration-200 ease-out w-5 h-5 text-blue-400">
+                    <div id="nav-compass-container" class="w-5 h-5 text-blue-400">
                         <svg viewBox="0 0 24 24" class="w-full h-full fill-current drop-shadow-sm" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2" /></svg>
                     </div>
                 </button>
@@ -419,7 +419,7 @@
                 Heading
             </h3>
             <div class="relative w-56 h-56 mx-auto rounded-full border-4 border-gray-700 flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,0.5),0_0_30px_rgba(0,0,0,0.3)] bg-gray-900 shrink-0 overflow-hidden">
-                <div id="large-compass-dial" class="absolute inset-0 transition-transform duration-200 ease-out pointer-events-none">
+                <div id="large-compass-dial" class="absolute inset-0 pointer-events-none">
                     <div id="compass-ticks-container" class="absolute inset-0"></div>
                     <div class="absolute top-2 left-1/2 transform -translate-x-1/2 text-red-500 font-bold text-base leading-none z-10">N</div>
                     <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-base leading-none z-10">E</div>
@@ -427,7 +427,7 @@
                     <div class="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-base leading-none z-10">W</div>
                     <div class="absolute inset-7 rounded-full border border-gray-700 pointer-events-none opacity-50"></div>
                 </div>
-                <div id="large-compass-container" class="absolute inset-0 m-auto transition-transform duration-200 ease-out w-24 h-24 text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)] z-10 flex items-center justify-center">
+                <div id="large-compass-container" class="absolute inset-0 m-auto w-24 h-24 text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)] z-10 flex items-center justify-center">
                     <svg viewBox="0 0 24 24" class="w-full h-full fill-current" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2" /></svg>
                 </div>
             </div>
@@ -480,9 +480,6 @@
         let deviceHeading = null;
         let navTargetBearing = null;
         let orientationRequested = false;
-        let currentNavRotation = 0; 
-        let currentDialRotation = 0; 
-        let currentUserRotation = 0;
         let isBottomPanelOpen = false;
         let isPlacingOverlay = false;
         let oldImgCenterBackup = null;
@@ -491,9 +488,7 @@
         let globalMarkerColor = '#ef4444';
         let globalMarkerShape = 'dot';
         let initialCenter = [51.505, -0.09];
-        let initialZoom = null;
-
-        const osZoomOffset = 7.45; // Precise math scaling offset between OS & EPSG3857 zoom curves
+        let initialZoom = 10;
 
         // Overlay State
         let overlays = []; // from idb
@@ -560,11 +555,7 @@
 
         function initMap() {
             const useOS = currentMapType === 'os_combined';
-            const defaultZoom = useOS ? 7 : 10;
-            const zoomToSet = initialZoom !== null ? initialZoom : defaultZoom;
-            
-            // Allow precision matching zoom snaps to unify OS and standard maps scaling identicals
-            const options = { zoomControl: false, center: initialCenter, zoom: zoomToSet, zoomSnap: 0.1, zoomDelta: 1 };
+            const options = { zoomControl: false, center: initialCenter, zoom: initialZoom };
             
             if (useOS) {
                 options.crs = osCrs;
@@ -593,17 +584,17 @@
 
         function rebuildMap(useOS) {
             const center = map.getCenter();
-            const zoom = map.getZoom();
+            let zoom = map.getZoom();
             map.remove(); 
             
-            const options = { zoomControl: false, center: center, zoomSnap: 0.1, zoomDelta: 1 };
+            const options = { zoomControl: false, center: center };
             if (useOS) {
                 options.crs = osCrs; options.minZoom = 0; options.maxZoom = 13;
-                options.zoom = Math.max(0, zoom - osZoomOffset); 
+                options.zoom = Math.min(13, zoom); 
                 const tC = arr => proj4('EPSG:27700', 'EPSG:4326', arr).reverse();
                 options.maxBounds = [tC([-238375.0, 0.0]), tC([900000.0, 1376256.0])];
             } else {
-                options.crs = L.CRS.EPSG3857; options.zoom = Math.min(19, zoom + osZoomOffset);
+                options.crs = L.CRS.EPSG3857; options.zoom = zoom;
             }
             
             map = L.map('map', options);
@@ -1159,8 +1150,7 @@
                 savedView: {
                     lat: map.getCenter().lat,
                     lng: map.getCenter().lng,
-                    zoom: map.getZoom(),
-                    isOS: (currentMapType === 'os_combined')
+                    zoom: map.getZoom()
                 }
             };
 
@@ -1224,20 +1214,13 @@
                 renderLeafletOverlay();
                 syncOpacitySlider();
                 
-                // Re-center map back to saved perspective if available, adjusting zoom level between CRS projections
                 if (data.savedView) {
                     let targetZoom = data.savedView.zoom;
-                    const currentIsOS = (currentMapType === 'os_combined');
-                    const savedIsOS = data.savedView.hasOwnProperty('isOS') ? data.savedView.isOS : (data.savedView.zoom <= 13 && currentMapType === 'os_combined');
-                    
-                    if (currentIsOS && !savedIsOS) {
-                        targetZoom = Math.max(0, Math.min(13, targetZoom - osZoomOffset));
-                    } else if (!currentIsOS && savedIsOS) {
-                        targetZoom = Math.max(0, Math.min(19, targetZoom + osZoomOffset));
-                    }
+                    const maxZoom = map.getMaxZoom();
+                    if (targetZoom > maxZoom) targetZoom = maxZoom;
                     map.setView([data.savedView.lat, data.savedView.lng], targetZoom);
                 } else {
-                    map.flyTo(imgCenter, Math.max(map.getZoom(), 14));
+                    map.flyTo(imgCenter, Math.min(map.getMaxZoom(), 14));
                 }
                 
                 renderOverlayList();
@@ -1252,20 +1235,13 @@
                 const data = await idbKeyval.get(id);
                 if (!data) return;
                 
-                // Switch focus map view back to saved perspective coordinates, adjusting zoom levels for CRS projections
                 if (data.savedView) {
                     let targetZoom = data.savedView.zoom;
-                    const currentIsOS = (currentMapType === 'os_combined');
-                    const savedIsOS = data.savedView.hasOwnProperty('isOS') ? data.savedView.isOS : (data.savedView.zoom <= 13 && currentMapType === 'os_combined');
-                    
-                    if (currentIsOS && !savedIsOS) {
-                        targetZoom = Math.max(0, Math.min(13, targetZoom - osZoomOffset));
-                    } else if (!currentIsOS && savedIsOS) {
-                        targetZoom = Math.max(0, Math.min(19, targetZoom + osZoomOffset));
-                    }
+                    const maxZoom = map.getMaxZoom();
+                    if (targetZoom > maxZoom) targetZoom = maxZoom;
                     map.flyTo([data.savedView.lat, data.savedView.lng], targetZoom);
                 } else if (data.calibration) {
-                    map.flyTo([data.calibration.lat, data.calibration.lng], Math.max(map.getZoom(), 14));
+                    map.flyTo([data.calibration.lat, data.calibration.lng], Math.min(map.getMaxZoom(), 14));
                 }
                 
                 if (window.innerWidth < 768) closeDrawerIfOpen();
@@ -1490,8 +1466,7 @@
             if (m) {
                 if(!m.isVisible) toggleMarkerVisibility(m.id);
                 if (isAutoCentering) { isAutoCentering = false; updateCenterButtonUI(); }
-                const targetZoom = currentMapType === 'os_combined' ? 9 : 15;
-                map.flyTo([m.lat, m.lng], targetZoom);
+                map.flyTo([m.lat, m.lng], 14);
                 if(window.innerWidth < 768) closeDrawerIfOpen();
             }
         }
@@ -1709,7 +1684,7 @@
             const userIcon = L.divIcon({
                 className: 'custom-user-icon',
                 html: `
-                    <div id="user-heading-container" class="absolute pointer-events-none transition-transform duration-100 ease-out" style="width: 60px; height: 60px; top: -22px; left: -22px; transform-origin: 30px 30px; display: none;">
+                    <div id="user-heading-container" class="absolute pointer-events-none" style="width: 60px; height: 60px; top: -22px; left: -22px; transform-origin: 30px 30px; display: none;">
                         <svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-md">
                             <path d="M 50 15 L 65 50 Q 50 45 35 50 Z" fill="rgba(59, 130, 246, 0.4)" stroke="rgba(59, 130, 246, 0.8)" stroke-width="1.5"/>
                         </svg>
@@ -1753,7 +1728,7 @@
             if (userPos) {
                 isAutoCentering = true;
                 updateCenterButtonUI();
-                map.flyTo([userPos.lat, userPos.lng], currentMapType === 'os_combined' ? 9 : 15);
+                map.flyTo([userPos.lat, userPos.lng], currentMapType === 'os_combined' ? 9 : 14);
             } else {
                 showAlert("Wait", "GPS location is still being acquired...");
             }
@@ -1800,14 +1775,7 @@
             const headingContainer = document.getElementById('user-heading-container');
             if (headingContainer && deviceHeading !== null && !isNaN(deviceHeading)) {
                 headingContainer.style.display = 'block';
-                
-                // Continuous accumulated transition calculations (Shortest Angular Path)
-                let delta = deviceHeading - (currentUserRotation % 360);
-                if (delta > 180) delta -= 360;
-                if (delta < -180) delta += 360;
-                currentUserRotation += delta;
-                
-                headingContainer.style.transform = `rotate(${currentUserRotation}deg)`;
+                headingContainer.style.transform = `rotate(${deviceHeading}deg)`;
             }
             if (navigatingToId) updateNavigationCompass();
         }
@@ -1864,21 +1832,9 @@
                 dialRotation = -userPos.heading;
             }
             
-            let delta = targetRotation - (currentNavRotation % 360);
-            if (delta > 180) delta -= 360;
-            if (delta < -180) delta += 360;
-            currentNavRotation += delta;
-            
-            compContainer.style.transform = `rotate(${currentNavRotation}deg)`;
-            if (largeCompContainer) largeCompContainer.style.transform = `rotate(${currentNavRotation}deg)`;
-            
-            if (dialContainer) {
-                let dialDelta = dialRotation - (currentDialRotation % 360);
-                if (dialDelta > 180) dialDelta -= 360;
-                if (dialDelta < -180) dialDelta += 360;
-                currentDialRotation += dialDelta;
-                dialContainer.style.transform = `rotate(${currentDialRotation}deg)`;
-            }
+            if (compContainer) compContainer.style.transform = `rotate(${targetRotation}deg)`;
+            if (largeCompContainer) largeCompContainer.style.transform = `rotate(${targetRotation}deg)`;
+            if (dialContainer) dialContainer.style.transform = `rotate(${dialRotation}deg)`;
         }
 
         function stopNavigation() {
