@@ -109,7 +109,7 @@
         <div id="nav-bar" class="bg-gray-700 text-white shadow-lg p-3 flex items-center justify-between transform -translate-y-full transition-transform duration-300 pointer-events-auto relative z-10">
             <div class="flex items-center space-x-3">
                 <button onclick="openCompassModal()" class="bg-gray-900 w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-800 transition-colors cursor-pointer shrink-0">
-                    <div id="nav-compass-container" class="w-5 h-5 text-blue-400">
+                    <div id="nav-compass-container" class="transition-transform duration-200 ease-out w-5 h-5 text-blue-400">
                         <svg viewBox="0 0 24 24" class="w-full h-full fill-current drop-shadow-sm" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2" /></svg>
                     </div>
                 </button>
@@ -268,7 +268,7 @@
         <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0">
             <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <i data-lucide="map" class="w-5 h-5 text-blue-600"></i>
-                Maverish test3
+                Maverish
             </h1>
             <button onclick="toggleDrawer()" class="p-2 text-gray-500 hover:text-gray-800 rounded-md">
                 <i data-lucide="x" class="w-5 h-5"></i>
@@ -419,7 +419,7 @@
                 Heading
             </h3>
             <div class="relative w-56 h-56 mx-auto rounded-full border-4 border-gray-700 flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,0.5),0_0_30px_rgba(0,0,0,0.3)] bg-gray-900 shrink-0 overflow-hidden">
-                <div id="large-compass-dial" class="absolute inset-0 pointer-events-none">
+                <div id="large-compass-dial" class="absolute inset-0 transition-transform duration-200 ease-out pointer-events-none">
                     <div id="compass-ticks-container" class="absolute inset-0"></div>
                     <div class="absolute top-2 left-1/2 transform -translate-x-1/2 text-red-500 font-bold text-base leading-none z-10">N</div>
                     <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-base leading-none z-10">E</div>
@@ -427,7 +427,7 @@
                     <div class="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-base leading-none z-10">W</div>
                     <div class="absolute inset-7 rounded-full border border-gray-700 pointer-events-none opacity-50"></div>
                 </div>
-                <div id="large-compass-container" class="absolute inset-0 m-auto w-24 h-24 text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)] z-10 flex items-center justify-center">
+                <div id="large-compass-container" class="absolute inset-0 m-auto transition-transform duration-200 ease-out w-24 h-24 text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)] z-10 flex items-center justify-center">
                     <svg viewBox="0 0 24 24" class="w-full h-full fill-current" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2" /></svg>
                 </div>
             </div>
@@ -480,6 +480,8 @@
         let deviceHeading = null;
         let navTargetBearing = null;
         let orientationRequested = false;
+        let currentNavRotation = 0; 
+        let currentDialRotation = 0; 
         let isBottomPanelOpen = false;
         let isPlacingOverlay = false;
         let oldImgCenterBackup = null;
@@ -489,8 +491,8 @@
         let globalMarkerShape = 'dot';
         let initialCenter = [51.505, -0.09];
         let initialZoom = 10;
-        
-        // --- Overlays State ---
+
+        // Overlay State
         let overlays = []; // from idb
         let activeOverlayId = null;
         let activeOverlayImgBlob = null;
@@ -622,6 +624,9 @@
                 leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation }).addTo(map);
                 renderLeafletOverlay();
             }
+
+            // Guarantee polyline is safely drawn on top of the newly generated base tiles
+            if (navPolyline) navPolyline.bringToFront();
         }
 
         // --- Map Setup ---
@@ -782,6 +787,9 @@
                     }
                 });
                 mapLayers[newId].addTo(map);
+                
+                // Guarantee polyline is safely drawn on top of the newly generated base tiles without rebuilds
+                if (navPolyline) navPolyline.bringToFront();
             }
             saveMapState();
             renderBaseMapsList();
@@ -1489,7 +1497,8 @@
             if (m) {
                 if(!m.isVisible) toggleMarkerVisibility(m.id);
                 if (isAutoCentering) { isAutoCentering = false; updateCenterButtonUI(); }
-                map.flyTo([m.lat, m.lng], 14);
+                const targetZoom = currentMapType === 'os_combined' ? 9 : 15;
+                map.flyTo([m.lat, m.lng], targetZoom);
                 if(window.innerWidth < 768) closeDrawerIfOpen();
             }
         }
@@ -1707,7 +1716,7 @@
             const userIcon = L.divIcon({
                 className: 'custom-user-icon',
                 html: `
-                    <div id="user-heading-container" class="absolute pointer-events-none" style="width: 60px; height: 60px; top: -22px; left: -22px; transform-origin: 30px 30px; display: none;">
+                    <div id="user-heading-container" class="absolute pointer-events-none transition-transform duration-100 ease-out" style="width: 60px; height: 60px; top: -22px; left: -22px; transform-origin: 30px 30px; display: none;">
                         <svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-md">
                             <path d="M 50 15 L 65 50 Q 50 45 35 50 Z" fill="rgba(59, 130, 246, 0.4)" stroke="rgba(59, 130, 246, 0.8)" stroke-width="1.5"/>
                         </svg>
@@ -1790,22 +1799,15 @@
         function handleOrientation(event) {
             let heading = null;
             if (event.webkitCompassHeading) heading = event.webkitCompassHeading;
-            else if (event.alpha !== null) heading = 360 - event.alpha;
+            else if (event.absolute && event.alpha !== null) heading = 360 - event.alpha;
             if (heading !== null) { deviceHeading = heading; updateHeadingUI(); }
         }
 
         function updateHeadingUI() {
             const headingContainer = document.getElementById('user-heading-container');
-            if (headingContainer && deviceHeading !== null && !isNaN(deviceHeading)) {
+            if (headingContainer) {
                 headingContainer.style.display = 'block';
-                
-                // Continuous accumulated transition calculations (Shortest Angular Path)
-                let delta = deviceHeading - (currentUserRotation % 360);
-                if (delta > 180) delta -= 360;
-                if (delta < -180) delta += 360;
-                currentUserRotation += delta;
-                
-                headingContainer.style.transform = `rotate(${currentUserRotation}deg)`;
+                headingContainer.style.transform = `rotate(${deviceHeading}deg)`;
             }
             if (navigatingToId) updateNavigationCompass();
         }
@@ -1867,7 +1869,7 @@
             if (delta < -180) delta += 360;
             currentNavRotation += delta;
             
-            compContainer.style.transform = `rotate(${currentNavRotation}deg)`;
+            if (compContainer) compContainer.style.transform = `rotate(${currentNavRotation}deg)`;
             if (largeCompContainer) largeCompContainer.style.transform = `rotate(${currentNavRotation}deg)`;
             
             if (dialContainer) {
