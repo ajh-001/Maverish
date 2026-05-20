@@ -109,7 +109,7 @@
         <div id="nav-bar" class="bg-gray-700 text-white shadow-lg p-3 flex items-center justify-between transform -translate-y-full transition-transform duration-300 pointer-events-auto relative z-10">
             <div class="flex items-center space-x-3">
                 <button onclick="openCompassModal()" class="bg-gray-900 w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-800 transition-colors cursor-pointer shrink-0">
-                    <div id="nav-compass-container" class="transition-transform duration-200 ease-out w-5 h-5 text-blue-400">
+                    <div id="nav-compass-container" class="w-5 h-5 text-blue-400">
                         <svg viewBox="0 0 24 24" class="w-full h-full fill-current drop-shadow-sm" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2" /></svg>
                     </div>
                 </button>
@@ -268,7 +268,7 @@
         <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0">
             <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <i data-lucide="map" class="w-5 h-5 text-blue-600"></i>
-                Maverish Maps
+                Maverish Maps z1
             </h1>
             <button onclick="toggleDrawer()" class="p-2 text-gray-500 hover:text-gray-800 rounded-md">
                 <i data-lucide="x" class="w-5 h-5"></i>
@@ -426,7 +426,7 @@
                 Heading
             </h3>
             <div class="relative w-56 h-56 mx-auto rounded-full border-4 border-gray-700 flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,0.5),0_0_30px_rgba(0,0,0,0.3)] bg-gray-900 shrink-0 overflow-hidden">
-                <div id="large-compass-dial" class="absolute inset-0 transition-transform duration-200 ease-out pointer-events-none">
+                <div id="large-compass-dial" class="absolute inset-0 pointer-events-none">
                     <div id="compass-ticks-container" class="absolute inset-0"></div>
                     <div class="absolute top-2 left-1/2 transform -translate-x-1/2 text-red-500 font-bold text-base leading-none z-10">N</div>
                     <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-base leading-none z-10">E</div>
@@ -434,7 +434,7 @@
                     <div class="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-base leading-none z-10">W</div>
                     <div class="absolute inset-7 rounded-full border border-gray-700 pointer-events-none opacity-50"></div>
                 </div>
-                <div id="large-compass-container" class="absolute inset-0 m-auto transition-transform duration-200 ease-out w-24 h-24 text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)] z-10 flex items-center justify-center">
+                <div id="large-compass-container" class="absolute inset-0 m-auto w-24 h-24 text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)] z-10 flex items-center justify-center">
                     <svg viewBox="0 0 24 24" class="w-full h-full fill-current" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2" /></svg>
                 </div>
             </div>
@@ -490,6 +490,7 @@
         let orientationRequested = false;
         let currentNavRotation = 0; 
         let currentDialRotation = 0; 
+        let currentUserRotation = 0;
         let isBottomPanelOpen = false;
         let isPlacingOverlay = false;
         let oldImgCenterBackup = null;
@@ -581,7 +582,6 @@
             map = L.map('map', options);
             L.control.zoom({ position: 'topright' }).addTo(map);
             
-            // Clean active base layer tracking
             if (useOS) {
                 currentBaseLayer = osCombinedGroup;
             } else {
@@ -616,7 +616,6 @@
             map = L.map('map', options);
             L.control.zoom({ position: 'topright' }).addTo(map);
             
-            // Clean active base layer tracking
             if (useOS) {
                 currentBaseLayer = osCombinedGroup;
             } else {
@@ -659,7 +658,6 @@
                     
                     imgCenter = e.latlng;
                     
-                    // Automatically calculate scale boundaries ONLY on fresh, unscaled placement (imgWidthLng = 0)
                     if (imgWidthLng === 0) {
                         imgRotation = 0;
                         imgOpacity = parseInt(document.getElementById('floating-opacity-slider').value) || 60;
@@ -799,14 +797,12 @@
             if (isOS !== wasOS) {
                 rebuildMap(isOS);
             } else {
-                // Ensure layer is removed properly before adding new one
                 if (currentBaseLayer && map.hasLayer(currentBaseLayer)) {
                     map.removeLayer(currentBaseLayer);
                 }
                 currentBaseLayer = mapLayers[newId];
                 currentBaseLayer.addTo(map);
                 
-                // Keep active items on top
                 if (navPolyline) navPolyline.bringToFront();
                 if (leafletImageOverlay) leafletImageOverlay.bringToFront();
             }
@@ -885,7 +881,7 @@
                 if (!editId) {
                     unloadOverlay();
                 } else {
-                    activateOverlay(editId); // Revert to saved state
+                    activateOverlay(editId); 
                 }
             }
             
@@ -918,7 +914,6 @@
             if (window.innerWidth < 768) closeDrawerIfOpen();
             setupPanelUI(type, id);
             
-            // Pauses tracking when jumping map
             isAutoCentering = false;
             updateCenterButtonUI();
             
@@ -957,7 +952,7 @@
                     delBtn.onclick = () => confirmDeleteMarker(editId);
                     
                     tempPickedCoords = { lat: m.lat, lng: m.lng };
-                    document.getElementById('coord-format').value = 'dd'; // DD safely stops pan snatching
+                    document.getElementById('coord-format').value = 'dd';
                     document.getElementById('picked-coords-display').innerText = `${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}`;
                     document.getElementById('dd-lat').value = m.lat.toFixed(6);
                     document.getElementById('dd-lng').value = m.lng.toFixed(6);
@@ -1035,7 +1030,6 @@
                     imgWidthLng = 0; 
                     isPlacingOverlay = true;
                     
-                    // Temporarily hide the panel to give a full view for placement
                     document.getElementById('bottom-panel').classList.replace('panel-open', 'panel-closed');
                     document.getElementById('map').classList.remove('map-squeezed');
                     document.getElementById('ui-layer').classList.remove('map-squeezed');
@@ -1172,7 +1166,6 @@
             const editId = document.getElementById('edit-item-id').value;
             const id = editId || 'ov_' + Date.now();
             
-            // Read image blob into a universally serializable ArrayBuffer to bypass WebView/DataClone errors
             let imageBuffer;
             try {
                 imageBuffer = await blobToArrayBuffer(activeOverlayImgBlob);
@@ -1209,7 +1202,6 @@
                 updateOpacitySliderVisibility();
             } catch(e) { 
                 console.error("IndexedDB Save Failed", e);
-                // Graceful guidance for partitioned sandboxes (Safari inside an Iframe)
                 if (e.name === 'SecurityError' || e.message.includes('SecurityError') || e.message.includes('partitioned')) {
                     showAlert("Storage Blocked", "Your browser is blocking local database access. This is common when viewing within an iframe preview on Safari or using Private Browsing. Please open the app directly outside this frame or use Chrome.");
                 } else {
@@ -1256,7 +1248,6 @@
                 renderLeafletOverlay();
                 syncOpacitySlider();
                 
-                // Re-center map back to saved perspective if available
                 if (data.savedView) {
                     let targetZoom = data.savedView.zoom;
                     const currentIsOS = (currentMapType === 'os_combined');
@@ -1287,7 +1278,6 @@
                 const data = await idbKeyval.get(id);
                 if (!data) return;
                 
-                // Switch focus map view back to saved perspective coordinates
                 if (data.savedView) {
                     let targetZoom = data.savedView.zoom;
                     const currentIsOS = (currentMapType === 'os_combined');
@@ -1746,7 +1736,7 @@
             const userIcon = L.divIcon({
                 className: 'custom-user-icon',
                 html: `
-                    <div id="user-heading-container" class="absolute pointer-events-none transition-transform duration-100 ease-out" style="width: 60px; height: 60px; top: -22px; left: -22px; transform-origin: 30px 30px; display: none;">
+                    <div id="user-heading-container" class="absolute pointer-events-none" style="width: 60px; height: 60px; top: -22px; left: -22px; transform-origin: 30px 30px; display: none;">
                         <svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-md">
                             <path d="M 50 15 L 65 50 Q 50 45 35 50 Z" fill="rgba(59, 130, 246, 0.4)" stroke="rgba(59, 130, 246, 0.8)" stroke-width="1.5"/>
                         </svg>
