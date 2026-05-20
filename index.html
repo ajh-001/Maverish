@@ -480,6 +480,8 @@
         let deviceHeading = null;
         let navTargetBearing = null;
         let orientationRequested = false;
+        let currentNavRotation = 0; 
+        let currentDialRotation = 0; 
         let isBottomPanelOpen = false;
         let isPlacingOverlay = false;
         let oldImgCenterBackup = null;
@@ -590,11 +592,11 @@
             const options = { zoomControl: false, center: center };
             if (useOS) {
                 options.crs = osCrs; options.minZoom = 0; options.maxZoom = 13;
-                options.zoom = Math.min(13, zoom); 
+                options.zoom = Math.max(0, zoom - 6); 
                 const tC = arr => proj4('EPSG:27700', 'EPSG:4326', arr).reverse();
                 options.maxBounds = [tC([-238375.0, 0.0]), tC([900000.0, 1376256.0])];
             } else {
-                options.crs = L.CRS.EPSG3857; options.zoom = zoom;
+                options.crs = L.CRS.EPSG3857; options.zoom = Math.min(19, zoom + 6);
             }
             
             map = L.map('map', options);
@@ -711,28 +713,36 @@
         
         function setupDrawerSwiping() {
             let touchStartX = 0;
-            let touchEndX = 0;
+            let touchStartY = 0;
 
             const drawerEl = document.getElementById('drawer');
             drawerEl.addEventListener('touchstart', e => {
                 touchStartX = e.changedTouches[0].screenX;
+                touchStartY = e.changedTouches[0].screenY;
             }, {passive: true});
 
             drawerEl.addEventListener('touchend', e => {
-                touchEndX = e.changedTouches[0].screenX;
-                handleDrawerSwipe();
+                const touchEndX = e.changedTouches[0].screenX;
+                const touchEndY = e.changedTouches[0].screenY;
+                handleDrawerSwipe(touchEndX, touchEndY);
             }, {passive: true});
 
-            function handleDrawerSwipe() {
-                const swipeThreshold = 60;
-                if (touchEndX < touchStartX - swipeThreshold) {
-                    if (currentDrawerTab === 'maps') switchDrawerTab('points');
-                    else if (currentDrawerTab === 'points') switchDrawerTab('overlays');
-                    else if (currentDrawerTab === 'overlays') closeDrawerIfOpen();
-                }
-                if (touchEndX > touchStartX + swipeThreshold) {
-                    if (currentDrawerTab === 'overlays') switchDrawerTab('points');
-                    else if (currentDrawerTab === 'points') switchDrawerTab('maps');
+            function handleDrawerSwipe(endX, endY) {
+                const swipeThresholdX = 60;
+                const swipeThresholdY = 40;
+                const diffX = endX - touchStartX;
+                const diffY = endY - touchStartY;
+
+                if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > swipeThresholdX) {
+                    if (diffX < 0) { // Swipe left
+                        if (currentDrawerTab === 'maps') switchDrawerTab('points');
+                        else if (currentDrawerTab === 'points') switchDrawerTab('overlays');
+                        else if (currentDrawerTab === 'overlays') closeDrawerIfOpen(); 
+                    } else { // Swipe right
+                        if (currentDrawerTab === 'overlays') switchDrawerTab('points');
+                        else if (currentDrawerTab === 'points') switchDrawerTab('maps');
+                        else if (currentDrawerTab === 'maps') closeDrawerIfOpen(); 
+                    }
                 }
             }
         }
@@ -742,18 +752,18 @@
             container.innerHTML = baseMapDefs.map(m => {
                 const isActive = m.id === currentMapType;
                 const activeClass = isActive ? 'bg-blue-50 rounded-lg' : '';
-                const textClass = isActive ? 'text-blue-800' : 'text-gray-800';
-                const iconClass = isActive ? 'text-blue-600' : 'text-gray-400';
-                const check = isActive ? '<i data-lucide="check" class="w-4 h-4 text-blue-600"></i>' : '';
+                const pulse = isActive ? '<span class="w-1.5 h-1.5 bg-blue-600 rounded-full flex-shrink-0 animate-pulse mr-2"></span>' : '';
                 return `
-                    <div class="p-2 relative border-b border-gray-100 last:border-0 transition-colors ${activeClass}">
-                        <button onclick="changeBaseMap('${m.id}')" class="w-full flex items-center justify-between transition-colors">
-                            <div class="flex items-center gap-3">
-                                <i data-lucide="${m.icon}" class="w-4 h-4 ${iconClass}"></i>
-                                <span class="text-sm font-bold ${textClass}">${m.name}</span>
+                    <div class="p-2 relative border-b border-gray-100 last:border-0 transition ${activeClass}">
+                        <div class="flex items-center justify-between gap-2 cursor-pointer" onclick="changeBaseMap('${m.id}')">
+                            <div class="flex items-center gap-2 min-w-0">
+                                ${pulse}
+                                <span class="text-sm font-bold text-gray-800 truncate">${m.name}</span>
                             </div>
-                            ${check}
-                        </button>
+                            <div class="flex items-center space-x-1 shrink-0 p-0.5">
+                                <i data-lucide="${m.icon}" class="w-4 h-4 text-gray-500"></i>
+                            </div>
+                        </div>
                     </div>
                 `;
             }).join('');
@@ -918,7 +928,7 @@
                     delBtn.onclick = () => confirmDeleteMarker(editId);
                     
                     tempPickedCoords = { lat: m.lat, lng: m.lng };
-                    document.getElementById('coord-format').value = 'dd'; // Safer format on edit so pan doesn't snap
+                    document.getElementById('coord-format').value = 'dd'; // Set DD (Degrees) by default on Edit
                     document.getElementById('picked-coords-display').innerText = `${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}`;
                     document.getElementById('dd-lat').value = m.lat.toFixed(6);
                     document.getElementById('dd-lng').value = m.lng.toFixed(6);
@@ -1150,7 +1160,8 @@
                 savedView: {
                     lat: map.getCenter().lat,
                     lng: map.getCenter().lng,
-                    zoom: map.getZoom()
+                    zoom: map.getZoom(),
+                    isOS: (currentMapType === 'os_combined')
                 }
             };
 
@@ -1214,10 +1225,17 @@
                 renderLeafletOverlay();
                 syncOpacitySlider();
                 
+                // Re-center map back to saved perspective if available, adjusting zoom level between CRS projections
                 if (data.savedView) {
                     let targetZoom = data.savedView.zoom;
-                    const maxZoom = map.getMaxZoom();
-                    if (targetZoom > maxZoom) targetZoom = maxZoom;
+                    const currentIsOS = (currentMapType === 'os_combined');
+                    const savedIsOS = data.savedView.hasOwnProperty('isOS') ? data.savedView.isOS : (data.savedView.zoom <= 13 && currentMapType === 'os_combined');
+                    
+                    if (currentIsOS && !savedIsOS) {
+                        targetZoom = Math.max(0, Math.min(13, targetZoom - 6));
+                    } else if (!currentIsOS && savedIsOS) {
+                        targetZoom = Math.max(0, Math.min(19, targetZoom + 6));
+                    }
                     map.setView([data.savedView.lat, data.savedView.lng], targetZoom);
                 } else {
                     map.flyTo(imgCenter, Math.min(map.getMaxZoom(), 14));
@@ -1235,10 +1253,17 @@
                 const data = await idbKeyval.get(id);
                 if (!data) return;
                 
+                // Switch focus map view back to saved perspective coordinates, adjusting zoom levels for CRS projections
                 if (data.savedView) {
                     let targetZoom = data.savedView.zoom;
-                    const maxZoom = map.getMaxZoom();
-                    if (targetZoom > maxZoom) targetZoom = maxZoom;
+                    const currentIsOS = (currentMapType === 'os_combined');
+                    const savedIsOS = data.savedView.hasOwnProperty('isOS') ? data.savedView.isOS : (data.savedView.zoom <= 13 && currentMapType === 'os_combined');
+                    
+                    if (currentIsOS && !savedIsOS) {
+                        targetZoom = Math.max(0, Math.min(13, targetZoom - 6));
+                    } else if (!currentIsOS && savedIsOS) {
+                        targetZoom = Math.max(0, Math.min(19, targetZoom + 6));
+                    }
                     map.flyTo([data.savedView.lat, data.savedView.lng], targetZoom);
                 } else if (data.calibration) {
                     map.flyTo([data.calibration.lat, data.calibration.lng], Math.min(map.getMaxZoom(), 14));
