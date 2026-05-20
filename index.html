@@ -58,6 +58,13 @@
         }
 
         .pointer-events-auto { pointer-events: auto; }
+
+        #nav-compass-container,
+        #large-compass-container,
+        #large-compass-dial {
+            transition: transform 0.18s linear;
+            will-change: transform;
+        }
         
         /* Drawer & Panel transitions */
         .drawer-open { transform: translateX(0%); }
@@ -482,6 +489,8 @@
         let orientationRequested = false;
         let currentNavRotation = 0; 
         let currentDialRotation = 0; 
+        let smoothedDeviceHeading = null;
+        let lastOrientationUpdate = 0;
         let isBottomPanelOpen = false;
         let isPlacingOverlay = false;
         let oldImgCenterBackup = null;
@@ -624,6 +633,14 @@
                 leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation }).addTo(map);
                 renderLeafletOverlay();
             }
+
+            map.fitBounds(bounds, { animate: false, padding: [0, 0] });
+
+            if (navPolyline) navPolyline.bringToFront();
+            if (userPosMarker) userPosMarker.bringToFront();
+            markers.forEach(m => {
+                if (m.leafletMarker && m.isVisible) m.leafletMarker.bringToFront();
+            });
         }
 
         // --- Map Setup ---
@@ -784,6 +801,9 @@
                     }
                 });
                 mapLayers[newId].addTo(map);
+
+                if (navPolyline) navPolyline.bringToFront();
+                if (leafletImageOverlay) leafletImageOverlay.bringToFront();
             }
             saveMapState();
             renderBaseMapsList();
@@ -1789,11 +1809,39 @@
             }
         }
 
+        function normalizeAngle(angle) {
+            return ((angle % 360) + 360) % 360;
+        }
+
+        function smoothHeading(previous, next, factor = 0.18) {
+            if (previous === null || isNaN(previous)) return normalizeAngle(next);
+            let delta = normalizeAngle(next - previous);
+            if (delta > 180) delta -= 360;
+            return normalizeAngle(previous + (delta * factor));
+        }
+
         function handleOrientation(event) {
+            const now = performance.now();
+            if (now - lastOrientationUpdate < 40) return;
+
             let heading = null;
-            if (event.webkitCompassHeading) heading = event.webkitCompassHeading;
-            else if (event.alpha !== null) heading = 360 - event.alpha;
-            if (heading !== null) { deviceHeading = heading; updateHeadingUI(); }
+
+            if (typeof event.webkitCompassHeading === 'number') {
+                heading = event.webkitCompassHeading;
+            } else if (event.absolute === true && typeof event.alpha === 'number') {
+                heading = 360 - event.alpha;
+            } else if (typeof event.alpha === 'number') {
+                heading = 360 - event.alpha;
+            }
+
+            if (heading === null || isNaN(heading)) return;
+
+            heading = normalizeAngle(heading);
+            smoothedDeviceHeading = smoothHeading(smoothedDeviceHeading, heading);
+            deviceHeading = smoothedDeviceHeading;
+            lastOrientationUpdate = now;
+
+            updateHeadingUI();
         }
 
         function updateHeadingUI() {
