@@ -43,18 +43,27 @@
         /* Crosshair Cursor for Placement */
         .map-placing-overlay, .map-placing-overlay .leaflet-interactive { cursor: crosshair !important; }
 
-        /* Custom User Location Marker */
-        .user-location-marker {
-            background-color: #3b82f6;
-            border: 3px solid #ffffff;
-            border-radius: 50%;
-            box-shadow: 0 0 15px rgba(59, 130, 246, 0.7);
-            animation: pulse 2s infinite;
+        /* --- Reverted to index.html Smooth Compass Marker Styles --- */
+        .user-location-marker { position: relative; }
+        .user-location-pulse {
+            background-color: rgba(66, 133, 244, 0.4);
+            width: 30px; height: 30px; border-radius: 50%; position: absolute;
+            top: 0; left: 0; animation: pulse 2s infinite; z-index: 1;
+        }
+        .user-location-dot {
+            background-color: #4285F4;
+            width: 14px; height: 14px; border-radius: 50%; border: 2px solid white;
+            box-shadow: 0 0 4px rgba(0,0,0,0.4); position: absolute;
+            top: 8px; left: 8px; z-index: 3;
+        }
+        .user-location-heading {
+            width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 14px solid rgba(66, 133, 244, 0.9);
+            position: absolute; top: -2px; left: 50%; transform-origin: 50% 17px; z-index: 2;
+            transition: transform 0.1s ease-out;
         }
         @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
-            70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+            0% { transform: scale(0.5); opacity: 1; }
+            100% { transform: scale(2.5); opacity: 0; }
         }
 
         .pointer-events-auto { pointer-events: auto; }
@@ -109,7 +118,7 @@
         <div id="nav-bar" class="bg-gray-700 text-white shadow-lg p-3 flex items-center justify-between transform -translate-y-full transition-transform duration-300 pointer-events-auto relative z-10">
             <div class="flex items-center space-x-3">
                 <button onclick="openCompassModal()" class="bg-gray-900 w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-800 transition-colors cursor-pointer shrink-0">
-                    <div id="nav-compass-container" class="w-5 h-5 text-blue-400">
+                    <div class="nav-compass-container-class transition-transform duration-200 ease-out w-5 h-5 text-blue-400">
                         <svg viewBox="0 0 24 24" class="w-full h-full fill-current drop-shadow-sm" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2" /></svg>
                     </div>
                 </button>
@@ -268,7 +277,7 @@
         <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0">
             <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <i data-lucide="map" class="w-5 h-5 text-blue-600"></i>
-                Maverish Maps z1
+                Maverish z2
             </h1>
             <button onclick="toggleDrawer()" class="p-2 text-gray-500 hover:text-gray-800 rounded-md">
                 <i data-lucide="x" class="w-5 h-5"></i>
@@ -386,7 +395,7 @@
                     <label class="block text-xs font-semibold text-gray-700 mb-2">Navigation Line Color</label>
                     <div class="flex items-center gap-3 bg-gray-50 border border-gray-300 rounded-lg p-2">
                         <input type="color" id="setting-nav-color" class="h-8 w-12 cursor-pointer rounded border-0 bg-transparent p-0">
-                        <span class="text-xs text-gray-600 font-medium">Select navigation line color</span>
+                        <span class="text-xs text-gray-600 font-medium">Select active path color</span>
                     </div>
                 </div>
             </div>
@@ -426,7 +435,7 @@
                 Heading
             </h3>
             <div class="relative w-56 h-56 mx-auto rounded-full border-4 border-gray-700 flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,0.5),0_0_30px_rgba(0,0,0,0.3)] bg-gray-900 shrink-0 overflow-hidden">
-                <div id="large-compass-dial" class="absolute inset-0 pointer-events-none">
+                <div class="large-compass-dial-class absolute inset-0 transition-transform duration-200 ease-out pointer-events-none">
                     <div id="compass-ticks-container" class="absolute inset-0"></div>
                     <div class="absolute top-2 left-1/2 transform -translate-x-1/2 text-red-500 font-bold text-base leading-none z-10">N</div>
                     <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-base leading-none z-10">E</div>
@@ -434,7 +443,7 @@
                     <div class="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-base leading-none z-10">W</div>
                     <div class="absolute inset-7 rounded-full border border-gray-700 pointer-events-none opacity-50"></div>
                 </div>
-                <div id="large-compass-container" class="absolute inset-0 m-auto w-24 h-24 text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)] z-10 flex items-center justify-center">
+                <div class="nav-compass-container-class absolute inset-0 m-auto transition-transform duration-200 ease-out w-24 h-24 text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)] z-10 flex items-center justify-center">
                     <svg viewBox="0 0 24 24" class="w-full h-full fill-current" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2" /></svg>
                 </div>
             </div>
@@ -631,6 +640,7 @@
                 if (m.isVisible) m.leafletMarker.addTo(map);
             });
             
+            // Clean recreate of the nav line
             if (navigatingToId) {
                 navPolyline = L.polyline([], { color: globalNavColor, weight: 3, dashArray: '10, 10' }).addTo(map);
                 updateNavigation();
@@ -641,8 +651,6 @@
                 leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation }).addTo(map);
                 renderLeafletOverlay();
             }
-
-            if (navPolyline) navPolyline.bringToFront();
         }
 
         // --- Map Setup ---
@@ -658,6 +666,7 @@
                     
                     imgCenter = e.latlng;
                     
+                    // Automatically calculate scale boundaries ONLY on fresh, unscaled placement (imgWidthLng = 0)
                     if (imgWidthLng === 0) {
                         imgRotation = 0;
                         imgOpacity = parseInt(document.getElementById('floating-opacity-slider').value) || 60;
@@ -803,8 +812,9 @@
                 currentBaseLayer = mapLayers[newId];
                 currentBaseLayer.addTo(map);
                 
-                if (navPolyline) navPolyline.bringToFront();
+                // Keep active items on top natively without custom panes
                 if (leafletImageOverlay) leafletImageOverlay.bringToFront();
+                if (navPolyline) navPolyline.bringToFront();
             }
             saveMapState();
             renderBaseMapsList();
@@ -952,7 +962,7 @@
                     delBtn.onclick = () => confirmDeleteMarker(editId);
                     
                     tempPickedCoords = { lat: m.lat, lng: m.lng };
-                    document.getElementById('coord-format').value = 'dd';
+                    document.getElementById('coord-format').value = 'dd'; // Safer format on edit so pan doesn't snap
                     document.getElementById('picked-coords-display').innerText = `${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}`;
                     document.getElementById('dd-lat').value = m.lat.toFixed(6);
                     document.getElementById('dd-lng').value = m.lng.toFixed(6);
@@ -1030,6 +1040,7 @@
                     imgWidthLng = 0; 
                     isPlacingOverlay = true;
                     
+                    // Temporarily hide the panel to give a full view for placement
                     document.getElementById('bottom-panel').classList.replace('panel-open', 'panel-closed');
                     document.getElementById('map').classList.remove('map-squeezed');
                     document.getElementById('ui-layer').classList.remove('map-squeezed');
@@ -1248,6 +1259,7 @@
                 renderLeafletOverlay();
                 syncOpacitySlider();
                 
+                // Re-center map back to saved perspective if available
                 if (data.savedView) {
                     let targetZoom = data.savedView.zoom;
                     const currentIsOS = (currentMapType === 'os_combined');
@@ -1278,6 +1290,7 @@
                 const data = await idbKeyval.get(id);
                 if (!data) return;
                 
+                // Switch focus map view back to saved perspective coordinates
                 if (data.savedView) {
                     let targetZoom = data.savedView.zoom;
                     const currentIsOS = (currentMapType === 'os_combined');
@@ -1736,15 +1749,12 @@
             const userIcon = L.divIcon({
                 className: 'custom-user-icon',
                 html: `
-                    <div id="user-heading-container" class="absolute pointer-events-none" style="width: 60px; height: 60px; top: -22px; left: -22px; transform-origin: 30px 30px; display: none;">
-                        <svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-md">
-                            <path d="M 50 15 L 65 50 Q 50 45 35 50 Z" fill="rgba(59, 130, 246, 0.4)" stroke="rgba(59, 130, 246, 0.8)" stroke-width="1.5"/>
-                        </svg>
-                    </div>
-                    <div class="user-location-marker w-4 h-4 relative z-10"></div>
+                    <div class="user-location-pulse"></div>
+                    <div class="heading-indicator user-location-heading" style="display:none;"></div>
+                    <div class="user-location-dot"></div>
                 `,
-                iconSize: [16, 16],
-                iconAnchor: [8, 8]
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
             });
             userPosMarker = L.marker([0, 0], { icon: userIcon, zIndexOffset: 1000 });
             if (userPos) userPosMarker.setLatLng([userPos.lat, userPos.lng]).addTo(map);
@@ -1824,9 +1834,8 @@
         }
 
         function updateHeadingUI() {
-            const headingContainer = document.getElementById('user-heading-container');
-            if (headingContainer && deviceHeading !== null && !isNaN(deviceHeading)) {
-                headingContainer.style.display = 'block';
+            const headingContainers = document.querySelectorAll('.heading-indicator');
+            if (headingContainers.length > 0 && deviceHeading !== null && !isNaN(deviceHeading)) {
                 
                 // Continuous accumulated transition calculations (Shortest Angular Path)
                 let delta = deviceHeading - (currentUserRotation % 360);
@@ -1834,7 +1843,10 @@
                 if (delta < -180) delta += 360;
                 currentUserRotation += delta;
                 
-                headingContainer.style.transform = `rotate(${currentUserRotation}deg)`;
+                headingContainers.forEach(el => {
+                    el.style.display = 'block';
+                    el.style.transform = `translateX(-50%) rotate(${currentUserRotation}deg)`;
+                });
             }
             if (navigatingToId) updateNavigationCompass();
         }
@@ -1849,7 +1861,9 @@
             document.getElementById('nav-bar').classList.remove('-translate-y-full');
             
             if (window.innerWidth < 768) closeDrawerIfOpen();
-            if (!navPolyline) navPolyline = L.polyline([], { color: globalNavColor, weight: 3, dashArray: '10, 10' }).addTo(map);
+            
+            if (navPolyline) { map.removeLayer(navPolyline); }
+            navPolyline = L.polyline([], { color: globalNavColor, weight: 3, dashArray: '10, 10' }).addTo(map);
             updateNavigation();
             
             const bounds = L.latLngBounds([userPos.lat, userPos.lng], [m.lat, m.lng]);
@@ -1876,9 +1890,8 @@
 
         function updateNavigationCompass() {
             if (navTargetBearing === null) return;
-            const compContainer = document.getElementById('nav-compass-container');
-            const largeCompContainer = document.getElementById('large-compass-container');
-            const dialContainer = document.getElementById('large-compass-dial');
+            const compContainers = document.querySelectorAll('.nav-compass-container-class');
+            const largeCompContainers = document.querySelectorAll('.large-compass-dial-class');
             
             let targetRotation = navTargetBearing;
             let dialRotation = 0;
@@ -1891,21 +1904,19 @@
                 dialRotation = -userPos.heading;
             }
             
-            let delta = targetRotation - (currentNavRotation % 360);
-            if (delta > 180) delta -= 360;
-            if (delta < -180) delta += 360;
-            currentNavRotation += delta;
+            let deltaTarget = targetRotation - (currentNavRotation % 360);
+            if (deltaTarget > 180) deltaTarget -= 360;
+            if (deltaTarget < -180) deltaTarget += 360;
+            currentNavRotation += deltaTarget;
             
-            if (compContainer) compContainer.style.transform = `rotate(${currentNavRotation}deg)`;
-            if (largeCompContainer) largeCompContainer.style.transform = `rotate(${currentNavRotation}deg)`;
+            compContainers.forEach(el => el.style.transform = `rotate(${currentNavRotation}deg)`);
             
-            if (dialContainer) {
-                let dialDelta = dialRotation - (currentDialRotation % 360);
-                if (dialDelta > 180) dialDelta -= 360;
-                if (dialDelta < -180) dialDelta += 360;
-                currentDialRotation += dialDelta;
-                dialContainer.style.transform = `rotate(${currentDialRotation}deg)`;
-            }
+            let deltaDial = dialRotation - (currentDialRotation % 360);
+            if (deltaDial > 180) deltaDial -= 360;
+            if (deltaDial < -180) deltaDial += 360;
+            currentDialRotation += deltaDial;
+            
+            largeCompContainers.forEach(el => el.style.transform = `rotate(${currentDialRotation}deg)`);
         }
 
         function stopNavigation() {
@@ -1968,12 +1979,8 @@
         function saveMapState() {
             if (!map) return;
             const settings = { 
-                color: globalMarkerColor, 
-                shape: globalMarkerShape, 
-                navColor: globalNavColor,
-                mapType: currentMapType,
-                center: map.getCenter(), 
-                zoom: map.getZoom()
+                color: globalMarkerColor, shape: globalMarkerShape, navColor: globalNavColor, mapType: currentMapType,
+                center: map.getCenter(), zoom: map.getZoom()
             };
             localStorage.setItem('maverish_settings', JSON.stringify(settings));
         }
