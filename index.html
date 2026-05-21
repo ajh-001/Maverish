@@ -13,7 +13,7 @@
     <meta name="theme-color" content="#1f2937" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <link rel="apple-touch-icon" href="/icon-192x192.png" />
+    <link class="apple-touch-icon" href="/icon-192x192.png" />
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -43,27 +43,18 @@
         /* Crosshair Cursor for Placement */
         .map-placing-overlay, .map-placing-overlay .leaflet-interactive { cursor: crosshair !important; }
 
-        /* --- Reverted to index.html Smooth Compass Marker Styles --- */
-        .user-location-marker { position: relative; }
-        .user-location-pulse {
-            background-color: rgba(66, 133, 244, 0.4);
-            width: 30px; height: 30px; border-radius: 50%; position: absolute;
-            top: 0; left: 0; animation: pulse 2s infinite; z-index: 1;
-        }
-        .user-location-dot {
-            background-color: #4285F4;
-            width: 14px; height: 14px; border-radius: 50%; border: 2px solid white;
-            box-shadow: 0 0 4px rgba(0,0,0,0.4); position: absolute;
-            top: 8px; left: 8px; z-index: 3;
-        }
-        .user-location-heading {
-            width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 14px solid rgba(66, 133, 244, 0.9);
-            position: absolute; top: -2px; left: 50%; transform-origin: 50% 17px; z-index: 2;
-            transition: transform 0.1s ease-out;
+        /* Custom User Location Marker from draft.html */
+        .user-location-marker {
+            background-color: #3b82f6;
+            border: 3px solid #ffffff;
+            border-radius: 50%;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.7);
+            animation: pulse 2s infinite;
         }
         @keyframes pulse {
-            0% { transform: scale(0.5); opacity: 1; }
-            100% { transform: scale(2.5); opacity: 0; }
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
         }
 
         .pointer-events-auto { pointer-events: auto; }
@@ -118,7 +109,7 @@
         <div id="nav-bar" class="bg-gray-700 text-white shadow-lg p-3 flex items-center justify-between transform -translate-y-full transition-transform duration-300 pointer-events-auto relative z-10">
             <div class="flex items-center space-x-3">
                 <button onclick="openCompassModal()" class="bg-gray-900 w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-800 transition-colors cursor-pointer shrink-0">
-                    <div class="nav-compass-container-class transition-transform duration-200 ease-out w-5 h-5 text-blue-400">
+                    <div id="nav-compass-container" class="nav-compass-container-class transition-transform duration-200 ease-out w-5 h-5 text-blue-400">
                         <svg viewBox="0 0 24 24" class="w-full h-full fill-current drop-shadow-sm" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2" /></svg>
                     </div>
                 </button>
@@ -277,7 +268,7 @@
         <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0">
             <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <i data-lucide="map" class="w-5 h-5 text-blue-600"></i>
-                Maverish z2
+                Maverish z3
             </h1>
             <button onclick="toggleDrawer()" class="p-2 text-gray-500 hover:text-gray-800 rounded-md">
                 <i data-lucide="x" class="w-5 h-5"></i>
@@ -435,7 +426,7 @@
                 Heading
             </h3>
             <div class="relative w-56 h-56 mx-auto rounded-full border-4 border-gray-700 flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,0.5),0_0_30px_rgba(0,0,0,0.3)] bg-gray-900 shrink-0 overflow-hidden">
-                <div class="large-compass-dial-class absolute inset-0 transition-transform duration-200 ease-out pointer-events-none">
+                <div id="large-compass-dial" class="large-compass-dial-class absolute inset-0 transition-transform duration-200 ease-out pointer-events-none">
                     <div id="compass-ticks-container" class="absolute inset-0"></div>
                     <div class="absolute top-2 left-1/2 transform -translate-x-1/2 text-red-500 font-bold text-base leading-none z-10">N</div>
                     <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-base leading-none z-10">E</div>
@@ -443,7 +434,7 @@
                     <div class="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-base leading-none z-10">W</div>
                     <div class="absolute inset-7 rounded-full border border-gray-700 pointer-events-none opacity-50"></div>
                 </div>
-                <div class="nav-compass-container-class absolute inset-0 m-auto transition-transform duration-200 ease-out w-24 h-24 text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)] z-10 flex items-center justify-center">
+                <div id="large-compass-container" class="nav-compass-container-class absolute inset-0 m-auto transition-transform duration-200 ease-out w-24 h-24 text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)] z-10 flex items-center justify-center">
                     <svg viewBox="0 0 24 24" class="w-full h-full fill-current" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2" /></svg>
                 </div>
             </div>
@@ -499,7 +490,6 @@
         let orientationRequested = false;
         let currentNavRotation = 0; 
         let currentDialRotation = 0; 
-        let currentUserRotation = 0;
         let isBottomPanelOpen = false;
         let isPlacingOverlay = false;
         let oldImgCenterBackup = null;
@@ -1523,6 +1513,135 @@
             renderMarkerList();
         }
 
+        // --- GPS Tracking & Heading Compass ---
+        
+        function initCompassTicks() {
+            const container = document.getElementById('compass-ticks-container');
+            if (!container) return;
+            for (let i = 0; i < 360; i += 15) {
+                if (i % 90 === 0) continue; 
+                const isLarge = i % 45 === 0;
+                const wrapper = document.createElement('div');
+                wrapper.className = 'absolute inset-0 flex justify-center';
+                wrapper.style.transform = `rotate(${i}deg)`;
+                const tick = document.createElement('div');
+                tick.className = `rounded-full mt-1 ${isLarge ? 'bg-gray-400' : 'bg-gray-600'}`;
+                tick.style.width = isLarge ? '3px' : '2px';
+                tick.style.height = isLarge ? '12px' : '6px';
+                wrapper.appendChild(tick);
+                container.appendChild(wrapper);
+            }
+        }
+
+        function initUserMarker() {
+            const userIcon = L.divIcon({
+                className: 'custom-user-icon',
+                html: `
+                    <div id="user-heading-container" class="absolute pointer-events-none transition-transform duration-100 ease-out" style="width: 60px; height: 60px; top: -22px; left: -22px; transform-origin: 30px 30px; display: none;">
+                        <svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-md">
+                            <path d="M 50 15 L 65 50 Q 50 45 35 50 Z" fill="rgba(59, 130, 246, 0.4)" stroke="rgba(59, 130, 246, 0.8)" stroke-width="1.5"/>
+                        </svg>
+                    </div>
+                    <div class="user-location-marker w-4 h-4 relative z-10"></div>
+                `,
+                iconSize: [16, 16],
+                iconAnchor: [8, 8]
+            });
+            userPosMarker = L.marker([0, 0], { icon: userIcon, zIndexOffset: 1000 });
+            if (userPos) userPosMarker.setLatLng([userPos.lat, userPos.lng]).addTo(map);
+        }
+
+        function startTracking() {
+            if ("geolocation" in navigator) {
+                watchId = navigator.geolocation.watchPosition(
+                    (position) => {
+                        userPos = { lat: position.coords.latitude, lng: position.coords.longitude, heading: position.coords.heading };
+                        updateUserPositionOnMap();
+                        if (navigatingToId) updateNavigation();
+                    },
+                    (error) => console.warn("Geolocation tracking error:", error),
+                    { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+                );
+            }
+        }
+
+        function updateUserPositionOnMap() {
+            if (!userPos) return;
+            const latlng = [userPos.lat, userPos.lng];
+            if (!map.hasLayer(userPosMarker)) {
+                userPosMarker.addTo(map);
+                map.setView(latlng, map.getZoom() || 14); 
+            }
+            userPosMarker.setLatLng(latlng);
+            updateHeadingUI();
+            if (isAutoCentering) map.setView(latlng);
+        }
+
+        function centerOnUser() {
+            if (userPos) {
+                isAutoCentering = true;
+                updateCenterButtonUI();
+                map.flyTo([userPos.lat, userPos.lng], currentMapType === 'os_combined' ? 9 : 14);
+            } else {
+                showAlert("Wait", "GPS location is still being acquired...");
+            }
+        }
+
+        function updateCenterButtonUI() {
+            const btn = document.getElementById('center-btn');
+            const icon = btn.querySelector('svg') || btn.querySelector('i');
+            if (icon) {
+                if (isAutoCentering) {
+                    btn.classList.add('bg-blue-100', 'border-blue-300');
+                    btn.classList.remove('bg-white', 'border-gray-200');
+                    icon.classList.add('text-blue-800'); icon.classList.remove('text-blue-600');
+                } else {
+                    btn.classList.remove('bg-blue-100', 'border-blue-300');
+                    btn.classList.add('bg-white', 'border-gray-200');
+                    icon.classList.remove('text-blue-800'); icon.classList.add('text-blue-600');
+                }
+            }
+        }
+
+        function requestOrientationPermission() {
+            if (orientationRequested) return;
+            orientationRequested = true;
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(response => {
+                        if (response == 'granted') window.addEventListener('deviceorientation', handleOrientation, true);
+                    }).catch(console.error);
+            } else {
+                window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+                window.addEventListener('deviceorientation', handleOrientation, true);
+            }
+        }
+
+        function handleOrientation(event) {
+            let heading = null;
+            if (event.webkitCompassHeading) {
+                heading = event.webkitCompassHeading;
+            } else if (event.absolute && event.alpha !== null) {
+                heading = 360 - event.alpha;
+            }
+            
+            if (heading !== null) {
+                deviceHeading = heading;
+                updateHeadingUI();
+            }
+        }
+
+        function updateHeadingUI() {
+            const headingContainer = document.getElementById('user-heading-container');
+            if (headingContainer && deviceHeading !== null && !isNaN(deviceHeading)) {
+                headingContainer.style.display = 'block';
+                headingContainer.style.transform = `rotate(${deviceHeading}deg)`;
+            }
+            if (navigatingToId) {
+                updateNavigationCompass();
+            }
+        }
+
         function centerOnMarker(id) {
             isAutoCentering = false;
             updateCenterButtonUI();
@@ -1725,132 +1844,6 @@
             } catch (err) {}
         }
 
-        // --- GPS Tracking & Heading Compass ---
-        
-        function initCompassTicks() {
-            const container = document.getElementById('compass-ticks-container');
-            if (!container) return;
-            for (let i = 0; i < 360; i += 15) {
-                if (i % 90 === 0) continue; 
-                const isLarge = i % 45 === 0;
-                const wrapper = document.createElement('div');
-                wrapper.className = 'absolute inset-0 flex justify-center';
-                wrapper.style.transform = `rotate(${i}deg)`;
-                const tick = document.createElement('div');
-                tick.className = `rounded-full mt-1 ${isLarge ? 'bg-gray-400' : 'bg-gray-600'}`;
-                tick.style.width = isLarge ? '3px' : '2px';
-                tick.style.height = isLarge ? '12px' : '6px';
-                wrapper.appendChild(tick);
-                container.appendChild(wrapper);
-            }
-        }
-
-        function initUserMarker() {
-            const userIcon = L.divIcon({
-                className: 'custom-user-icon',
-                html: `
-                    <div class="user-location-pulse"></div>
-                    <div class="heading-indicator user-location-heading" style="display:none;"></div>
-                    <div class="user-location-dot"></div>
-                `,
-                iconSize: [30, 30],
-                iconAnchor: [15, 15]
-            });
-            userPosMarker = L.marker([0, 0], { icon: userIcon, zIndexOffset: 1000 });
-            if (userPos) userPosMarker.setLatLng([userPos.lat, userPos.lng]).addTo(map);
-        }
-
-        function startTracking() {
-            if ("geolocation" in navigator) {
-                watchId = navigator.geolocation.watchPosition(
-                    (position) => {
-                        userPos = { lat: position.coords.latitude, lng: position.coords.longitude, heading: position.coords.heading };
-                        updateUserPositionOnMap();
-                        if (navigatingToId) updateNavigation();
-                    },
-                    (error) => console.warn("Geolocation tracking error:", error),
-                    { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
-                );
-            }
-        }
-
-        function updateUserPositionOnMap() {
-            if (!userPos) return;
-            const latlng = [userPos.lat, userPos.lng];
-            if (!map.hasLayer(userPosMarker)) {
-                userPosMarker.addTo(map);
-                map.setView(latlng, map.getZoom() || 14); 
-            }
-            userPosMarker.setLatLng(latlng);
-            updateHeadingUI();
-            if (isAutoCentering) map.setView(latlng);
-        }
-
-        function centerOnUser() {
-            if (userPos) {
-                isAutoCentering = true;
-                updateCenterButtonUI();
-                map.flyTo([userPos.lat, userPos.lng], currentMapType === 'os_combined' ? 9 : 14);
-            } else {
-                showAlert("Wait", "GPS location is still being acquired...");
-            }
-        }
-
-        function updateCenterButtonUI() {
-            const btn = document.getElementById('center-btn');
-            const icon = btn.querySelector('svg') || btn.querySelector('i');
-            if (icon) {
-                if (isAutoCentering) {
-                    btn.classList.add('bg-blue-100', 'border-blue-300');
-                    btn.classList.remove('bg-white', 'border-gray-200');
-                    icon.classList.add('text-blue-800'); icon.classList.remove('text-blue-600');
-                } else {
-                    btn.classList.remove('bg-blue-100', 'border-blue-300');
-                    btn.classList.add('bg-white', 'border-gray-200');
-                    icon.classList.remove('text-blue-800'); icon.classList.add('text-blue-600');
-                }
-            }
-        }
-
-        function requestOrientationPermission() {
-            if (orientationRequested) return;
-            orientationRequested = true;
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission()
-                    .then(response => {
-                        if (response == 'granted') window.addEventListener('deviceorientation', handleOrientation, true);
-                    }).catch(console.error);
-            } else {
-                window.addEventListener('deviceorientationabsolute', handleOrientation, true);
-                window.addEventListener('deviceorientation', handleOrientation, true);
-            }
-        }
-
-        function handleOrientation(event) {
-            let heading = null;
-            if (event.webkitCompassHeading) heading = event.webkitCompassHeading;
-            else if (event.alpha !== null) heading = 360 - event.alpha;
-            if (heading !== null) { deviceHeading = heading; updateHeadingUI(); }
-        }
-
-        function updateHeadingUI() {
-            const headingContainers = document.querySelectorAll('.heading-indicator');
-            if (headingContainers.length > 0 && deviceHeading !== null && !isNaN(deviceHeading)) {
-                
-                // Continuous accumulated transition calculations (Shortest Angular Path)
-                let delta = deviceHeading - (currentUserRotation % 360);
-                if (delta > 180) delta -= 360;
-                if (delta < -180) delta += 360;
-                currentUserRotation += delta;
-                
-                headingContainers.forEach(el => {
-                    el.style.display = 'block';
-                    el.style.transform = `translateX(-50%) rotate(${currentUserRotation}deg)`;
-                });
-            }
-            if (navigatingToId) updateNavigationCompass();
-        }
-
         function startNavigation(id) {
             const m = markers.find(x => x.id === id);
             if (!m) return;
@@ -1890,8 +1883,9 @@
 
         function updateNavigationCompass() {
             if (navTargetBearing === null) return;
-            const compContainers = document.querySelectorAll('.nav-compass-container-class');
-            const largeCompContainers = document.querySelectorAll('.large-compass-dial-class');
+            const compContainer = document.getElementById('nav-compass-container');
+            const largeCompContainer = document.getElementById('large-compass-container');
+            const dialContainer = document.getElementById('large-compass-dial');
             
             let targetRotation = navTargetBearing;
             let dialRotation = 0;
@@ -1904,19 +1898,22 @@
                 dialRotation = -userPos.heading;
             }
             
+            // Shortest rotational path calculations
             let deltaTarget = targetRotation - (currentNavRotation % 360);
             if (deltaTarget > 180) deltaTarget -= 360;
             if (deltaTarget < -180) deltaTarget += 360;
             currentNavRotation += deltaTarget;
             
-            compContainers.forEach(el => el.style.transform = `rotate(${currentNavRotation}deg)`);
+            if (compContainer) compContainer.style.transform = `rotate(${currentNavRotation}deg)`;
+            if (largeCompContainer) largeCompContainer.style.transform = `rotate(${currentNavRotation}deg)`;
             
-            let deltaDial = dialRotation - (currentDialRotation % 360);
-            if (deltaDial > 180) deltaDial -= 360;
-            if (deltaDial < -180) deltaDial += 360;
-            currentDialRotation += deltaDial;
-            
-            largeCompContainers.forEach(el => el.style.transform = `rotate(${currentDialRotation}deg)`);
+            if (dialContainer) {
+                let deltaDial = dialRotation - (currentDialRotation % 360);
+                if (deltaDial > 180) deltaDial -= 360;
+                if (deltaDial < -180) deltaDial += 360;
+                currentDialRotation += deltaDial;
+                dialContainer.style.transform = `rotate(${currentDialRotation}deg)`;
+            }
         }
 
         function stopNavigation() {
