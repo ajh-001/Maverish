@@ -49,7 +49,6 @@
         
         /* Map Squeeze Class */
         .map-squeezed { bottom: 380px !important; }
-        .map-squeezed-advanced { bottom: 65vh !important; }
         
         /* Crosshair Cursor for Placement */
         .map-placing-overlay, .map-placing-overlay .leaflet-interactive { cursor: crosshair !important; }
@@ -287,19 +286,19 @@
                     <!-- ADVANCED WARP CONTROLS -->
                     <div id="overlay-advanced-controls" class="hidden flex flex-col gap-3">
                         <!-- Advanced split-screen workspace container -->
-                        <div class="border border-gray-200 rounded-xl overflow-hidden bg-gray-50 flex flex-col h-[280px]">
+                        <div class="border border-gray-200 rounded-xl overflow-hidden bg-gray-50 flex flex-col h-[280px] shrink-0">
                             <!-- Instruction Header -->
                             <div class="bg-gray-100 px-3 py-1.5 border-b border-gray-200 flex justify-between items-center text-[11px] font-bold text-gray-700 shrink-0">
                                 <span id="warp-instruction">Step 1: Tap point on bottom Image</span>
                                 <div class="flex gap-1">
-                                    <button type="button" onclick="undoLastWarpPoint()" class="px-2 py-0.5 bg-white border rounded hover:bg-gray-100 transition">Undo Pt</button>
+                                    <button type="button" id="btn-delete-point" onclick="toggleDeletePointMode()" class="px-2 py-0.5 bg-white text-gray-700 border border-gray-300 rounded hover:bg-gray-100 transition">Delete Pt</button>
                                     <button type="button" onclick="clearWarpPoints()" class="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 transition">Clear</button>
                                 </div>
                             </div>
                             <!-- Bottom/Image Simple Map Workspace for Points Mapping -->
                             <div class="flex-1 relative bg-slate-100">
                                 <div id="warp-image-map" class="w-full h-full cursor-crosshair"></div>
-                                <div id="warp-image-placeholder" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-slate-400 text-xs text-center p-4">
+                                <div id="warp-image-placeholder" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-slate-400 text-xs text-center p-4 pointer-events-none">
                                     <i data-lucide="image" class="w-8 h-8 opacity-40 mb-1"></i>
                                     <p>Select or upload an image file first to begin control point mapping.</p>
                                 </div>
@@ -311,8 +310,8 @@
                         </div>
                     </div>
 
-                    <!-- Advanced Warp Toggle / Center / File Row (Moved below the editing workspaces) -->
-                    <div class="flex gap-2 w-full mt-2">
+                    <!-- Advanced Warp Toggle / Center / File Row -->
+                    <div class="flex gap-2 w-full mt-2 shrink-0">
                         <label class="flex-1 flex flex-col items-center justify-center bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-[10px] font-bold py-2 rounded-lg transition text-center shadow-sm cursor-pointer">
                             <i data-lucide="image" class="w-4 h-4 mb-1"></i>
                             <span>Image File</span>
@@ -345,7 +344,7 @@
     <div id="drawer" class="absolute top-0 left-0 h-full w-80 max-w-[85vw] bg-white shadow-2xl z-[30] drawer-closed transition-transform duration-300 flex flex-col pointer-events-auto">
         <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0">
             <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-                <i data-lucide="map" class="w-5 h-5 text-blue-600"></i>
+                <img src="Maverish_trans.png" alt="Logo" class="w-6 h-6 object-contain">
                 Maverish Pro
             </h1>
             <button onclick="toggleDrawer()" class="p-2 text-gray-500 hover:text-gray-800 rounded-md">
@@ -789,6 +788,7 @@
         // Warp specific states
         let warpPoints = []; // List of { img: {x,y}, map: L.LatLng }
         let currentWarpStep = 'img'; // 'img' or 'map'
+        let isDeletingPoint = false;
         let warpImageMap = null;
         let warpImageLayer = null;
         let imgMarkers = [];
@@ -1041,6 +1041,8 @@
             map.on('dragstart', () => { if (isAutoCentering) { isAutoCentering = false; updateCenterButtonUI(); } });
             
             map.on('click', (e) => {
+                if (isDeletingPoint) return; // Prevent mapping actions while in delete point mode
+
                 if (isPlacingOverlay) {
                     isPlacingOverlay = false;
                     document.getElementById('map-instruction-overlay').classList.add('hidden');
@@ -1071,27 +1073,10 @@
                     if (currentWarpStep !== 'map') return;
                     
                     const pointIdx = warpPoints.length - 1;
-                    const icon = L.divIcon({
-                        className: 'custom-div-icon',
-                        html: `<div class='map-marker-icon' style='width:22px; height:22px;'>${pointIdx + 1}</div>`,
-                        iconSize: [22, 22],
-                        iconAnchor: [11, 11]
-                    });
-                    
-                    const marker = L.marker(e.latlng, { icon: icon, draggable: true }).addTo(map);
-                    
-                    marker.on('drag', function(ev) {
-                        const index = mapMarkers.indexOf(ev.target);
-                        if (index !== -1) {
-                            warpPoints[index].map = ev.target.getLatLng();
-                            if (warpPoints.length >= 3) renderRubberSheetOverlay();
-                        }
-                    });
-                    
-                    mapMarkers.push(marker);
                     warpPoints[pointIdx].map = e.latlng;
                     currentWarpStep = 'img';
-                    updateWarpUI();
+                    
+                    rebuildWarpMarkersOnMap(); // Rebuilds array natively providing events
                     
                     if (warpPoints.length >= 3) renderRubberSheetOverlay();
                 }
@@ -1121,36 +1106,16 @@
         // --- Warp Image Map setup ---
         function setupWarpImageMapListeners() {
             warpImageMap.on('click', function(e) {
+                if (isDeletingPoint) return; // Prevent creating points while deleting
                 if (!activeOverlayImgBlob) return;
                 if (currentWarpStep !== 'img') return;
 
                 let x = e.latlng.lng, y = -e.latlng.lat; 
                 if (x < 0 || y < 0 || x > calImgObj.naturalWidth || y > calImgObj.naturalHeight) return;
 
-                const pointIdx = warpPoints.length;
-                const icon = L.divIcon({
-                    className: 'custom-div-icon',
-                    html: `<div class='img-marker-icon' style='width:22px; height:22px;'>${pointIdx + 1}</div>`,
-                    iconSize: [22, 22],
-                    iconAnchor: [11, 11]
-                });
-                
-                const marker = L.marker([e.latlng.lat, e.latlng.lng], { icon: icon, draggable: true }).addTo(warpImageMap);
-
-                marker.on('drag', function(ev) {
-                    const index = imgMarkers.indexOf(ev.target);
-                    if (index !== -1) {
-                        const currentLatLng = ev.target.getLatLng();
-                        warpPoints[index].img.x = currentLatLng.lng;
-                        warpPoints[index].img.y = -currentLatLng.lat;
-                        if (warpPoints.length >= 3) renderRubberSheetOverlay();
-                    }
-                });
-
-                imgMarkers.push(marker);
                 warpPoints.push({ img: {x, y}, map: null });
                 currentWarpStep = 'map';
-                updateWarpUI();
+                rebuildWarpMarkersOnMap();
             });
         }
 
@@ -1168,24 +1133,51 @@
             }
         }
 
-        function undoLastWarpPoint() {
-            if (warpPoints.length === 0) return;
-            warpPoints.pop();
-            const lastImgMkr = imgMarkers.pop(); if (lastImgMkr) warpImageMap.removeLayer(lastImgMkr);
+        function toggleDeletePointMode() {
+            if (warpPoints.length === 0) return; 
+            isDeletingPoint = !isDeletingPoint;
             
-            if (currentWarpStep === 'img') {
-                const lastMapMkr = mapMarkers.pop(); if (lastMapMkr) map.removeLayer(lastMapMkr);
+            const btn = document.getElementById('btn-delete-point');
+            if (isDeletingPoint) {
+                btn.classList.remove('bg-white', 'text-gray-700', 'border-gray-300');
+                btn.classList.add('bg-red-600', 'text-white', 'border-red-600');
+                btn.innerText = 'Tap a Pt';
             } else {
-                currentWarpStep = 'img';
+                resetDeletePointMode();
             }
-            updateWarpUI();
-            if (warpPoints.length >= 3) renderRubberSheetOverlay();
-            else removeRubberSheetOverlay();
+        }
+
+        function resetDeletePointMode() {
+            isDeletingPoint = false;
+            const btn = document.getElementById('btn-delete-point');
+            if (btn) {
+                btn.classList.add('bg-white', 'text-gray-700', 'border-gray-300');
+                btn.classList.remove('bg-red-600', 'text-white', 'border-red-600');
+                btn.innerText = 'Delete Pt';
+            }
+        }
+
+        function handleWarpMarkerClick(index) {
+            if (!isDeletingPoint) return;
+            
+            // Remove the selected point pair
+            warpPoints.splice(index, 1);
+            resetDeletePointMode();
+            
+            // Re-render markers and recalculate mesh
+            rebuildWarpMarkersOnMap();
+            
+            if (warpPoints.filter(p => p.map !== null).length >= 3) {
+                renderRubberSheetOverlay();
+            } else {
+                removeRubberSheetOverlay();
+            }
         }
 
         function clearWarpPoints() {
             warpPoints = [];
             currentWarpStep = 'img';
+            resetDeletePointMode();
             removeAllWarpMarkers();
             updateWarpUI();
             removeRubberSheetOverlay();
@@ -1291,22 +1283,28 @@
             const wasOS = currentMapType === 'os_combined';
             currentMapType = newId;
             
-            if (isOS !== wasOS) {
-                rebuildMap(isOS);
-            } else {
-                if (currentBaseLayer && map.hasLayer(currentBaseLayer)) {
-                    map.removeLayer(currentBaseLayer);
+            try {
+                if (isOS !== wasOS) {
+                    rebuildMap(isOS);
+                } else {
+                    if (currentBaseLayer && map.hasLayer(currentBaseLayer)) {
+                        map.removeLayer(currentBaseLayer);
+                    }
+                    currentBaseLayer = mapLayers[newId];
+                    currentBaseLayer.addTo(map);
+                    
+                    // Safely keep active items on top natively without custom panes
+                    try {
+                        if (leafletImageOverlay && typeof leafletImageOverlay.bringToFront === 'function') leafletImageOverlay.bringToFront();
+                        if (leafletRubberSheetOverlay && typeof leafletRubberSheetOverlay.bringToFront === 'function') leafletRubberSheetOverlay.bringToFront();
+                        if (navPolyline && typeof navPolyline.bringToFront === 'function') navPolyline.bringToFront();
+                    } catch (e) { console.warn('Could not bring layers to front', e); }
                 }
-                currentBaseLayer = mapLayers[newId];
-                currentBaseLayer.addTo(map);
-                
-                // Keep active items on top natively without custom panes
-                if (leafletImageOverlay) leafletImageOverlay.bringToFront();
-                if (leafletRubberSheetOverlay) leafletRubberSheetOverlay.bringToFront();
-                if (navPolyline) navPolyline.bringToFront();
+                saveMapState();
+            } finally {
+                // Ensure highlighting applies regardless of layer errors
+                renderBaseMapsList();
             }
-            saveMapState();
-            renderBaseMapsList();
         }
 
         // --- Menu Modals ---
@@ -1404,13 +1402,14 @@
         }
 
         function closeBottomPanel() {
-            document.getElementById('map').classList.remove('map-squeezed', 'map-squeezed-advanced');
-            document.getElementById('ui-layer').classList.remove('map-squeezed', 'map-squeezed-advanced');
+            document.getElementById('map').classList.remove('map-squeezed');
+            document.getElementById('ui-layer').classList.remove('map-squeezed');
             document.getElementById('bottom-panel').classList.remove('panel-open');
             document.getElementById('bottom-panel').style.height = ''; // Reset height to default
             document.getElementById('bottom-panel').classList.add('panel-closed');
             isBottomPanelOpen = false;
-
+            
+            resetDeletePointMode();
             removeAllWarpMarkers(); // Safely purge markers when closing
             animateMapSqueeze(false);
             updateOpacitySliderVisibility();
@@ -1473,9 +1472,7 @@
             if (type === 'point') {
                 bPanel.style.height = ''; // Reset height
                 mapContainer.classList.add('map-squeezed');
-                mapContainer.classList.remove('map-squeezed-advanced');
                 uiLayer.classList.add('map-squeezed');
-                uiLayer.classList.remove('map-squeezed-advanced');
 
                 pContent.classList.remove('hidden'); oContent.classList.add('hidden');
                 document.getElementById('name-label').innerText = 'Point Name / Label';
@@ -1521,6 +1518,7 @@
                 document.getElementById('name-label').innerText = 'Overlay Map Name';
                 
                 removeAllWarpMarkers(); // Aggressive clean up on panel switch
+                resetDeletePointMode();
 
                 if (editId) {
                     const o = overlays.find(x => x.id === editId);
@@ -1639,8 +1637,8 @@
                         
                         // Temporarily hide the panel to give a full view for placement
                         document.getElementById('bottom-panel').classList.replace('panel-open', 'panel-closed');
-                        document.getElementById('map').classList.remove('map-squeezed', 'map-squeezed-advanced');
-                        document.getElementById('ui-layer').classList.remove('map-squeezed', 'map-squeezed-advanced');
+                        document.getElementById('map').classList.remove('map-squeezed');
+                        document.getElementById('ui-layer').classList.remove('map-squeezed');
                         isBottomPanelOpen = false;
                         updateOpacitySliderVisibility();
 
@@ -1670,8 +1668,8 @@
             isPlacingOverlay = true;
             
             document.getElementById('bottom-panel').classList.replace('panel-open', 'panel-closed');
-            document.getElementById('map').classList.remove('map-squeezed', 'map-squeezed-advanced');
-            document.getElementById('ui-layer').classList.remove('map-squeezed', 'map-squeezed-advanced');
+            document.getElementById('map').classList.remove('map-squeezed');
+            document.getElementById('ui-layer').classList.remove('map-squeezed');
             isBottomPanelOpen = false;
             
             animateMapSqueeze(false);
@@ -1716,6 +1714,7 @@
         // --- Toggle Advanced Warp Mode ---
         function toggleAdvancedWarpMode() {
             overlayMode = overlayMode === 'standard' ? 'warp' : 'standard';
+            resetDeletePointMode();
             
             // Re-render and configure active layers cleanly
             if (overlayMode === 'standard') {
@@ -1759,11 +1758,9 @@
                 stdBlock.classList.add('hidden');
                 advBlock.classList.remove('hidden');
 
-                bPanel.style.height = '65vh'; // Expand height of editor for split view
-                mapContainer.classList.add('map-squeezed-advanced');
-                mapContainer.classList.remove('map-squeezed');
-                uiLayer.classList.add('map-squeezed-advanced');
-                uiLayer.classList.remove('map-squeezed');
+                bPanel.style.height = ''; // Ensure standard height
+                mapContainer.classList.add('map-squeezed');
+                uiLayer.classList.add('map-squeezed');
 
                 setTimeout(() => {
                     warpImageMap.invalidateSize();
@@ -1787,11 +1784,9 @@
                 stdBlock.classList.remove('hidden');
                 advBlock.classList.add('hidden');
 
-                bPanel.style.height = ''; // Squeeze back down
+                bPanel.style.height = ''; 
                 mapContainer.classList.add('map-squeezed');
-                mapContainer.classList.remove('map-squeezed-advanced');
                 uiLayer.classList.add('map-squeezed');
-                uiLayer.classList.remove('map-squeezed-advanced');
 
                 removeAllWarpMarkers();
             }
@@ -1809,12 +1804,15 @@
                     iconAnchor: [11, 11]
                 });
                 const imgMkr = L.marker([pt.img.y ? -pt.img.y : 0, pt.img.x], { icon: imgIcon, draggable: true }).addTo(warpImageMap);
+                
                 imgMkr.on('drag', function(ev) {
                     const currentLatLng = ev.target.getLatLng();
                     warpPoints[index].img.x = currentLatLng.lng;
                     warpPoints[index].img.y = -currentLatLng.lat;
-                    if (warpPoints.length >= 3) renderRubberSheetOverlay();
+                    if (warpPoints.filter(p => p.map !== null).length >= 3) renderRubberSheetOverlay();
                 });
+                imgMkr.on('click', function() { handleWarpMarkerClick(index); });
+                
                 imgMarkers.push(imgMkr);
 
                 // Add main map marker
@@ -1826,13 +1824,23 @@
                         iconAnchor: [11, 11]
                     });
                     const mapMkr = L.marker(pt.map, { icon: mapIcon, draggable: true }).addTo(map);
+                    
                     mapMkr.on('drag', function(ev) {
                         warpPoints[index].map = ev.target.getLatLng();
-                        if (warpPoints.length >= 3) renderRubberSheetOverlay();
+                        if (warpPoints.filter(p => p.map !== null).length >= 3) renderRubberSheetOverlay();
                     });
+                    mapMkr.on('click', function() { handleWarpMarkerClick(index); });
+                    
                     mapMarkers.push(mapMkr);
                 }
             });
+
+            // Ensure current step matches data (e.g. if a dangling point remains)
+            if (warpPoints.length > 0 && warpPoints[warpPoints.length - 1].map === null) {
+                currentWarpStep = 'map';
+            } else {
+                currentWarpStep = 'img';
+            }
 
             updateWarpUI();
         }
@@ -1997,6 +2005,7 @@
 
                 if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
                 removeRubberSheetOverlay();
+                resetDeletePointMode();
                 
                 if (activeOverlayBlobUrl) URL.revokeObjectURL(activeOverlayBlobUrl);
 
@@ -2109,7 +2118,8 @@
             activeOverlayImgBlob = null;
             warpPoints = [];
             currentWarpStep = 'img';
-
+            
+            resetDeletePointMode();
             removeAllWarpMarkers();
             updateWarpUI();
 
@@ -2797,9 +2807,9 @@
                 currentBaseLayer.addTo(map);
                 
                 // Preserve stacking order natively
-                if (leafletImageOverlay) leafletImageOverlay.bringToFront();
-                if (leafletRubberSheetOverlay) leafletRubberSheetOverlay.bringToFront();
-                if (navPolyline) navPolyline.bringToFront();
+                if (leafletImageOverlay && typeof leafletImageOverlay.bringToFront === 'function') leafletImageOverlay.bringToFront();
+                if (leafletRubberSheetOverlay && typeof leafletRubberSheetOverlay.bringToFront === 'function') leafletRubberSheetOverlay.bringToFront();
+                if (navPolyline && typeof navPolyline.bringToFront === 'function') navPolyline.bringToFront();
             }
             
             saveMapState();
