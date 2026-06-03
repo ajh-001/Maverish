@@ -30,6 +30,16 @@
     <!-- idb-keyval for lightweight IndexedDB access -->
     <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
 
+    <!-- Delaunator (for generating the triangle mesh) -->
+    <script src="https://unpkg.com/delaunator@5.0.0/delaunator.js"></script>
+
+    <!-- Cropper.js CSS & JS for Image Pre-processing -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+
+    <!-- SortableJS for Drag and Drop Lists -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background-color: #f3f4f6; }
         
@@ -39,6 +49,7 @@
         
         /* Map Squeeze Class */
         .map-squeezed { bottom: 380px !important; }
+        .map-squeezed-advanced { bottom: 65vh !important; }
         
         /* Crosshair Cursor for Placement */
         .map-placing-overlay, .map-placing-overlay .leaflet-interactive { cursor: crosshair !important; }
@@ -79,6 +90,37 @@
         /* Tab styling */
         .tab-active { border-bottom: 2px solid #2563eb; color: #2563eb; font-weight: bold; }
         .tab-inactive { border-bottom: 2px solid transparent; color: #6b7280; font-weight: 500; }
+
+        /* Warp markers custom style */
+        .map-marker-icon {
+            background-color: #4f46e5;
+            color: white; border: 2px solid white; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 11px; box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+            cursor: grab;
+        }
+        .map-marker-icon:active { cursor: grabbing; }
+
+        .img-marker-icon {
+            background-color: #ef4444;
+            color: white; border: 2px solid white; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 11px; box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+            cursor: grab;
+        }
+        .img-marker-icon:active { cursor: grabbing; }
+
+        /* The dynamic canvas injected into leaflet */
+        .leaflet-rubbersheet-overlay {
+            position: absolute !important;
+            top: 0; left: 0;
+            pointer-events: none !important;
+            z-index: 500 !important;
+        }
+        
+        /* Drag handle highlight */
+        .sortable-ghost { opacity: 0.4; }
+        .drag-handle { touch-action: none; }
     </style>
 </head>
 <body class="text-gray-800 font-sans antialiased">
@@ -99,7 +141,7 @@
         
         <!-- Map Instruction Banner for Image Placement -->
         <div id="map-instruction-overlay" class="hidden absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white pl-6 pr-2 py-2 rounded-full shadow-lg z-[1000] font-bold pointer-events-auto flex items-center justify-between gap-4 w-11/12 max-w-md transition-opacity">
-            <span class="text-sm">Click map to place image center.</span>
+            <span id="instruction-overlay-text" class="text-sm">Click map to place image center.</span>
             <button onclick="cancelOverlayPlacement()" class="bg-blue-800 hover:bg-blue-900 rounded-full p-1.5 transition-colors">
                 <i data-lucide="x" class="w-4 h-4"></i>
             </button>
@@ -212,41 +254,77 @@
             <div id="panel-overlay-content" class="hidden">
                 <div class="flex flex-col gap-4">
                     
-                    <!-- Fine Controls Grid -->
-                    <div class="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-xl border border-gray-200">
-                        <!-- D-Pad -->
-                        <div class="flex flex-col items-center">
-                            <div class="grid grid-cols-3 gap-1 w-[120px]">
-                                <div></div>
-                                <button id="btn-nudge-up" class="touch-control bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="chevron-up" class="w-5 h-5"></i></button>
-                                <div></div>
-                                <button id="btn-nudge-left" class="touch-control bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
-                                <button id="btn-nudge-down" class="touch-control bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="chevron-down" class="w-5 h-5"></i></button>
-                                <button id="btn-nudge-right" class="touch-control bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+                    <!-- STANDARD CONTROLS (Nudge, Rotate, Scale) -->
+                    <div id="overlay-standard-controls" class="flex flex-col gap-4">
+                        <!-- Fine Controls Grid -->
+                        <div class="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                            <!-- D-Pad -->
+                            <div class="flex flex-col items-center">
+                                <div class="grid grid-cols-3 gap-1 w-[120px]">
+                                    <div></div>
+                                    <button id="btn-nudge-up" class="touch-control bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="chevron-up" class="w-5 h-5"></i></button>
+                                    <div></div>
+                                    <button id="btn-nudge-left" class="touch-control bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
+                                    <button id="btn-nudge-down" class="touch-control bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="chevron-down" class="w-5 h-5"></i></button>
+                                    <button id="btn-nudge-right" class="touch-control bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+                                </div>
                             </div>
-                        </div>
 
-                        <!-- Scale & Rotate -->
-                        <div class="flex flex-col justify-center gap-2">
-                            <div class="flex gap-2">
-                                <button id="btn-scale-down" class="touch-control flex-1 bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="zoom-out" class="w-5 h-5"></i></button>
-                                <button id="btn-scale-up" class="touch-control flex-1 bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="zoom-in" class="w-5 h-5"></i></button>
-                            </div>
-                            <div class="flex gap-2">
-                                <button id="btn-rotate-left" class="touch-control flex-1 bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="rotate-ccw" class="w-5 h-5"></i></button>
-                                <button id="btn-rotate-right" class="touch-control flex-1 bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="rotate-cw" class="w-5 h-5"></i></button>
+                            <!-- Scale & Rotate -->
+                            <div class="flex flex-col justify-center gap-2">
+                                <div class="flex gap-2">
+                                    <button id="btn-scale-down" class="touch-control flex-1 bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="zoom-out" class="w-5 h-5"></i></button>
+                                    <button id="btn-scale-up" class="touch-control flex-1 bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="zoom-in" class="w-5 h-5"></i></button>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button id="btn-rotate-left" class="touch-control flex-1 bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="rotate-ccw" class="w-5 h-5"></i></button>
+                                    <button id="btn-rotate-right" class="touch-control flex-1 bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="rotate-cw" class="w-5 h-5"></i></button>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Image Modification Options -->
-                    <div class="flex gap-2 w-full">
-                        <label class="flex-1 flex items-center justify-center gap-2 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-bold py-2.5 rounded-lg transition text-center shadow-sm cursor-pointer">
-                            <i data-lucide="image" class="w-4 h-4"></i> Change Image File
+                    <!-- ADVANCED WARP CONTROLS -->
+                    <div id="overlay-advanced-controls" class="hidden flex flex-col gap-3">
+                        <!-- Advanced split-screen workspace container -->
+                        <div class="border border-gray-200 rounded-xl overflow-hidden bg-gray-50 flex flex-col h-[280px]">
+                            <!-- Instruction Header -->
+                            <div class="bg-gray-100 px-3 py-1.5 border-b border-gray-200 flex justify-between items-center text-[11px] font-bold text-gray-700 shrink-0">
+                                <span id="warp-instruction">Step 1: Tap point on bottom Image</span>
+                                <div class="flex gap-1">
+                                    <button type="button" onclick="undoLastWarpPoint()" class="px-2 py-0.5 bg-white border rounded hover:bg-gray-100 transition">Undo Pt</button>
+                                    <button type="button" onclick="clearWarpPoints()" class="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 transition">Clear</button>
+                                </div>
+                            </div>
+                            <!-- Bottom/Image Simple Map Workspace for Points Mapping -->
+                            <div class="flex-1 relative bg-slate-100">
+                                <div id="warp-image-map" class="w-full h-full cursor-crosshair"></div>
+                                <div id="warp-image-placeholder" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-slate-400 text-xs text-center p-4">
+                                    <i data-lucide="image" class="w-8 h-8 opacity-40 mb-1"></i>
+                                    <p>Select or upload an image file first to begin control point mapping.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center text-[10px] text-gray-500 font-medium px-1">
+                            <span>Points mapped: <b id="warp-point-counter" class="text-blue-600">0</b> (Min: 3)</span>
+                            <span>Points link corresponding landmarks.</span>
+                        </div>
+                    </div>
+
+                    <!-- Advanced Warp Toggle / Center / File Row (Moved below the editing workspaces) -->
+                    <div class="flex gap-2 w-full mt-2">
+                        <label class="flex-1 flex flex-col items-center justify-center bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-[10px] font-bold py-2 rounded-lg transition text-center shadow-sm cursor-pointer">
+                            <i data-lucide="image" class="w-4 h-4 mb-1"></i>
+                            <span>Image File</span>
                             <input type="file" id="overlay-file-input" class="hidden" accept="image/*">
                         </label>
-                        <button type="button" onclick="triggerOverlayReselect()" class="flex-1 flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 text-xs font-bold py-2.5 rounded-lg transition text-center shadow-sm">
-                            <i data-lucide="crosshair" class="w-4 h-4"></i> Reselect Center
+                        <button type="button" id="btn-trigger-reselect" onclick="triggerOverlayReselect()" class="flex-1 flex flex-col items-center justify-center bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 text-[10px] font-bold py-2 rounded-lg transition text-center shadow-sm">
+                            <i data-lucide="crosshair" class="w-4 h-4 mb-1"></i>
+                            <span>Center</span>
+                        </button>
+                        <button type="button" id="btn-toggle-advanced-mode" onclick="toggleAdvancedWarpMode()" class="flex-1 flex flex-col items-center justify-center bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200 text-[10px] font-bold py-2 rounded-lg transition text-center shadow-sm">
+                            <i data-lucide="scan" class="w-4 h-4 mb-1"></i>
+                            <span id="text-toggle-advanced-mode">Warp OFF</span>
                         </button>
                     </div>
 
@@ -258,7 +336,7 @@
             <button id="panel-delete-btn" class="px-4 py-2 text-red-600 text-sm font-medium hover:bg-red-100 rounded-lg transition hidden">Delete</button>
             <div class="flex space-x-3 ml-auto">
                 <button onclick="cancelItem()" class="px-4 py-2 text-gray-600 text-sm font-medium hover:bg-gray-200 rounded-lg transition">Cancel</button>
-                <button onclick="saveItem()" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 rounded-lg shadow-md transition">Save</button>
+                <button id="panel-save-btn" onclick="saveItem()" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 rounded-lg shadow-md transition">Save</button>
             </div>
         </div>
     </div>
@@ -268,7 +346,7 @@
         <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0">
             <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <i data-lucide="map" class="w-5 h-5 text-blue-600"></i>
-                Maverish
+                Maverish Pro
             </h1>
             <button onclick="toggleDrawer()" class="p-2 text-gray-500 hover:text-gray-800 rounded-md">
                 <i data-lucide="x" class="w-5 h-5"></i>
@@ -295,7 +373,7 @@
             <!-- Points Tab -->
             <div id="drawer-points" class="hidden p-4 flex flex-col h-full overflow-hidden">
                 <div id="marker-list" class="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-0">
-                    <div class="text-center text-xs text-gray-500 mt-6">No points added yet.</div>
+                    <!-- Markers rendered dynamically -->
                 </div>
                 <div class="mt-4 flex gap-2 shrink-0">
                     <button onclick="openPanelForNew('point')" class="flex-1 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-semibold py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors">
@@ -310,7 +388,7 @@
             <!-- Overlays Tab -->
             <div id="drawer-overlays" class="hidden p-4 flex flex-col h-full overflow-hidden">
                 <div id="overlay-list" class="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-0">
-                    <div class="text-center text-xs text-gray-500 mt-6">No overlays saved yet.</div>
+                    <!-- Overlays rendered dynamically -->
                 </div>
                 <div class="flex gap-2 mt-4 shrink-0">
                     <button onclick="openPanelForNew('overlay')" class="flex-1 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-semibold py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors">
@@ -351,7 +429,7 @@
                 <div class="bg-green-100 text-green-600 p-2 rounded-full"><i data-lucide="image" class="w-5 h-5"></i></div>
                 <div>
                     <div class="font-bold text-gray-800 text-sm">Map Overlay</div>
-                    <div class="text-xs text-gray-500">Align a photo over the map</div>
+                    <div class="text-xs text-gray-500">Align or warp a photo over the map</div>
                 </div>
             </button>
             <div class="p-2 bg-gray-50">
@@ -433,10 +511,14 @@
         <div id="compass-modal" class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col items-center justify-center p-8 border border-gray-700 text-center mx-auto">
             <h3 class="text-lg font-bold text-gray-100 mb-6 flex items-center justify-center gap-2 w-full">
                 <i data-lucide="navigation-2" class="w-5 h-5 text-blue-400"></i>
-                Heading
+                <span id="compass-modal-title">Heading</span>
             </h3>
-            <div class="relative w-56 h-56 mx-auto rounded-full border-4 border-gray-700 flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,0.5),0_0_30px_rgba(0,0,0,0.3)] bg-gray-900 shrink-0 overflow-hidden">
-                <div id="large-compass-dial" class="large-compass-dial-class absolute inset-0 transition-transform duration-200 ease-out pointer-events-none">
+            <div class="relative w-56 h-56 mx-auto rounded-full border-4 border-gray-700 flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,0.5),0_0_30px_rgba(0,0,0,0.3)] bg-gray-900 shrink-0">
+                
+                <!-- Fixed dot just above the compass for alignment -->
+                <div class="absolute -top-4 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gray-100 border-[3px] border-gray-800 rounded-full z-30 shadow-sm"></div>
+
+                <div id="large-compass-dial" class="large-compass-dial-class absolute inset-0 transition-transform duration-200 ease-out pointer-events-none rounded-full overflow-hidden">
                     <div id="compass-ticks-container" class="absolute inset-0"></div>
                     <div class="absolute top-2 left-1/2 transform -translate-x-1/2 text-red-500 font-bold text-base leading-none z-10">N</div>
                     <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-base leading-none z-10">E</div>
@@ -444,8 +526,14 @@
                     <div class="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-base leading-none z-10">W</div>
                     <div class="absolute inset-7 rounded-full border border-gray-700 pointer-events-none opacity-50"></div>
                 </div>
-                <div id="large-compass-container" class="nav-compass-container-class absolute inset-0 m-auto transition-transform duration-200 ease-out w-24 h-24 text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)] z-10 flex items-center justify-center">
-                    <svg viewBox="0 0 24 24" class="w-full h-full fill-current" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2" /></svg>
+                <div id="large-compass-container" class="nav-compass-container-class absolute inset-0 transition-transform duration-200 ease-out z-10">
+                    <!-- Dot aligned with the arrow -->
+                    <div class="absolute top-2 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.8)]"></div>
+
+                    <!-- Centered Arrow -->
+                    <div class="absolute inset-0 m-auto w-24 h-24 flex items-center justify-center text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.6)]">
+                        <svg viewBox="0 0 24 24" class="w-full h-full fill-current" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2" /></svg>
+                    </div>
                 </div>
             </div>
             <div class="mt-6 mb-8 w-full text-center">
@@ -455,7 +543,38 @@
             <button onclick="closeModals()" class="px-6 py-2 bg-gray-700 text-white text-sm hover:bg-gray-600 rounded-xl font-medium shadow-md transition w-full">Close</button>
         </div>
 
+        <!-- Pre-Processing Modal (Crop & Rotate) -->
+        <div id="crop-modal" class="hidden bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg pointer-events-auto flex flex-col max-h-[90vh] overflow-hidden">
+            <!-- Modal Header -->
+            <div class="bg-slate-800 border-b border-slate-700 px-4 py-3 flex items-center justify-between text-white shrink-0">
+                <h2 class="font-bold flex items-center gap-2 text-sm">
+                    <i data-lucide="crop" class="w-4 h-4"></i> Crop & Rotate Image
+                </h2>
+                <div class="flex gap-2">
+                    <button onclick="closeCropModal()" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs font-semibold text-white transition">Cancel</button>
+                    <button onclick="applyCrop()" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs font-bold text-white transition">Apply</button>
+                </div>
+            </div>
+            <!-- Toolbar -->
+            <div class="bg-slate-800/80 px-4 py-2 flex justify-center gap-3 shrink-0 border-b border-slate-700">
+                <button onclick="if(cropper) cropper.rotate(-90)" class="flex items-center gap-1 px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs font-semibold transition">
+                    <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Rotate Left
+                </button>
+                <button onclick="if(cropper) cropper.rotate(90)" class="flex items-center gap-1 px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs font-semibold transition">
+                    <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i> Rotate Right
+                </button>
+                <button onclick="if(cropper) cropper.reset()" class="px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs font-semibold transition">Reset</button>
+            </div>
+            <!-- Cropper Canvas -->
+            <div class="flex-1 overflow-hidden bg-slate-950 flex items-center justify-center p-4 min-h-[250px]">
+                <img id="image-to-crop" src="" class="max-w-full max-h-full block">
+            </div>
+        </div>
+
     </div>
+
+    <!-- Hidden native image element for processing map data -->
+    <img id="hidden-source-image" src="" alt="" style="display:none;">
 
     <!-- Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -463,7 +582,139 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4leaflet/1.0.2/proj4leaflet.min.js"></script>
     
     <script>
-        // --- Custom Rotated Image Overlay ---
+        // --- Piecewise Affine Warping Math Utilities ---
+        function getAffineTransform(src, dst) {
+            let x0 = src[0].x, y0 = src[0].y, x1 = src[1].x, y1 = src[1].y, x2 = src[2].x, y2 = src[2].y;
+            let u0 = dst[0].x, v0 = dst[0].y, u1 = dst[1].x, v1 = dst[1].y, u2 = dst[2].x, v2 = dst[2].y;
+
+            let det = x0 * (y1 - y2) - y0 * (x1 - x2) + (x1 * y2 - x2 * y1);
+            if (Math.abs(det) < 1e-10) return null;
+
+            let a = (u0 * (y1 - y2) - y0 * (u1 - u2) + (u1 * y2 - u2 * y1)) / det;
+            let c = (x0 * (u1 - u2) - u0 * (x1 - x2) + (x1 * u2 - x2 * u1)) / det;
+            let e = u0 - a * x0 - c * y0;
+            let b = (v0 * (y1 - y2) - y0 * (v1 - v2) + (v1 * y2 - v2 * y1)) / det;
+            let d = (x0 * (v1 - v2) - v0 * (x1 - x2) + (x1 * v2 - x2 * v1)) / det;
+            let f = v0 - b * x0 - d * y0;
+
+            return [a, b, c, d, e, f];
+        }
+
+        function getTriangleArea(p1, p2, p3) {
+            return Math.abs((p1.x*(p2.y-p3.y) + p2.x*(p3.y-p1.y) + p3.x*(p1.y-p2.y))/2);
+        }
+
+        // --- Custom Rubbersheet Overlay Layer ---
+        L.RubberSheetOverlay = L.Layer.extend({
+            initialize: function (imgElement, userPoints, options) {
+                this._img = imgElement;
+                this._userPts = userPoints; // List of { img: {x,y}, map: L.LatLng }
+                L.setOptions(this, options);
+            },
+            onAdd: function (map) {
+                this._map = map;
+                this._canvas = L.DomUtil.create('canvas', 'leaflet-rubbersheet-overlay');
+                this._canvas.style.opacity = this.options.opacity || 0.8;
+                map.getPanes().overlayPane.appendChild(this._canvas);
+                this._buildMesh();
+                map.on('moveend zoomend viewreset', this._redraw, this);
+                this._redraw();
+            },
+            onRemove: function (map) {
+                if (this._canvas && this._canvas.parentNode) this._canvas.parentNode.removeChild(this._canvas);
+                map.off('moveend zoomend viewreset', this._redraw, this);
+            },
+            setOpacity: function (opacity) {
+                this.options.opacity = opacity;
+                if (this._canvas) this._canvas.style.opacity = opacity;
+            },
+            _buildMesh: function() {
+                this._allPts = [...this._userPts];
+                const mapZoom = 0;
+                let maxArea = -1, bestSet = null;
+
+                if (this._userPts.length >= 3) {
+                    for(let i=0; i<this._userPts.length-2; i++) {
+                        for(let j=i+1; j<this._userPts.length-1; j++) {
+                            for(let k=j+1; k<this._userPts.length; k++) {
+                                let area = getTriangleArea(this._userPts[i].img, this._userPts[j].img, this._userPts[k].img);
+                                if (area > maxArea) { maxArea = area; bestSet = [this._userPts[i], this._userPts[j], this._userPts[k]]; }
+                            }
+                        }
+                    }
+                }
+
+                if (bestSet && maxArea > 10) {
+                    const src3 = bestSet.map(p => p.img);
+                    const dst3 = bestSet.map(p => this._map.project(p.map, mapZoom));
+                    const M = getAffineTransform(src3, dst3);
+                    if (M) {
+                        const w = this._img.naturalWidth, h = this._img.naturalHeight;
+                        [{x:0,y:0}, {x:w,y:0}, {x:w,y:h}, {x:0,y:h}].forEach(c => {
+                            let px = M[0]*c.x + M[2]*c.y + M[4];
+                            let py = M[1]*c.x + M[3]*c.y + M[5];
+                            this._allPts.push({ img: c, map: this._map.unproject(L.point(px, py), mapZoom) });
+                        });
+                    }
+                }
+
+                const coords = [];
+                this._allPts.forEach(p => coords.push(p.img.x, p.img.y));
+                const delaunay = new Delaunator(coords);
+                
+                this._triangles = [];
+                for (let i = 0; i < delaunay.triangles.length; i += 3) {
+                    this._triangles.push([
+                        this._allPts[delaunay.triangles[i]],
+                        this._allPts[delaunay.triangles[i+1]],
+                        this._allPts[delaunay.triangles[i+2]]
+                    ]);
+                }
+            },
+            _redraw: function () {
+                if (!this._map || this._allPts.length === 0) return;
+                const bounds = L.bounds(this._allPts.map(p => this._map.latLngToLayerPoint(p.map)));
+                const padding = 50;
+                const topLeft = bounds.min.subtract([padding, padding]);
+                const size = bounds.getSize().add([padding*2, padding*2]);
+
+                L.DomUtil.setPosition(this._canvas, topLeft);
+                
+                const dpr = window.devicePixelRatio || 1;
+                this._canvas.width = size.x * dpr;
+                this._canvas.height = size.y * dpr;
+                this._canvas.style.width = size.x + 'px';
+                this._canvas.style.height = size.y + 'px';
+
+                const ctx = this._canvas.getContext('2d');
+                ctx.scale(dpr, dpr);
+                ctx.clearRect(0, 0, size.x, size.y);
+                ctx.imageSmoothingEnabled = true;
+
+                this._triangles.forEach(tri => {
+                    const p0 = tri[0].img, p1 = tri[1].img, p2 = tri[2].img;
+                    const getPt = (p) => {
+                        let lPt = this._map.latLngToLayerPoint(p.map);
+                        return { x: lPt.x - topLeft.x, y: lPt.y - topLeft.y };
+                    };
+                    const q0 = getPt(tri[0]), q1 = getPt(tri[1]), q2 = getPt(tri[2]);
+                    const M = getAffineTransform([p0, p1, p2], [q0, q1, q2]);
+                    if (!M) return;
+
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(q0.x, q0.y); ctx.lineTo(q1.x, q1.y); ctx.lineTo(q2.x, q2.y);
+                    ctx.closePath(); ctx.clip();
+                    ctx.transform(M[0], M[1], M[2], M[3], M[4], M[5]);
+                    
+                    ctx.drawImage(this._img, 0, 0);
+
+                    ctx.restore();
+                });
+            }
+        });
+
+        // --- Custom Rotated Image Overlay (Standard Mode) ---
         L.RotatedImageOverlay = L.ImageOverlay.extend({
             options: { angle: 0 },
             setAngle: function(angle) {
@@ -519,7 +770,13 @@
         let activeOverlayId = null;
         let activeOverlayImgBlob = null;
         let activeOverlayBlobUrl = null;
-        let leafletImageOverlay = null;
+        
+        // Active display layers
+        let leafletImageOverlay = null; // Used in standard mode
+        let leafletRubberSheetOverlay = null; // Used in advanced warp mode
+        
+        // General positioning options
+        let overlayMode = 'standard'; // 'standard' or 'warp'
         let imgCenter = null;
         let imgWidthLng = 0;
         let imgHeightLat = 0;
@@ -527,8 +784,39 @@
         let imgOpacity = 60;
         let calImgObj = new Image();
 
+        let isMapAnimating = false; // Flag to prevent map centering fights during UI transitions
+
+        // Warp specific states
+        let warpPoints = []; // List of { img: {x,y}, map: L.LatLng }
+        let currentWarpStep = 'img'; // 'img' or 'map'
+        let warpImageMap = null;
+        let warpImageLayer = null;
+        let imgMarkers = [];
+        let mapMarkers = [];
+        let cropper = null;
+
+        // Force purges ALL warp markers safely
+        function removeAllWarpMarkers() {
+            if (imgMarkers && warpImageMap) {
+                imgMarkers.forEach(m => { 
+                    if (warpImageMap.hasLayer(m)) warpImageMap.removeLayer(m); 
+                    if (m.remove) m.remove(); 
+                });
+            }
+            imgMarkers = [];
+            
+            if (mapMarkers && map) {
+                mapMarkers.forEach(m => { 
+                    if (map.hasLayer(m)) map.removeLayer(m); 
+                    if (m.remove) m.remove(); 
+                });
+            }
+            mapMarkers = [];
+        }
+
         const baseMapDefs = [
             { id: 'os_combined', name: 'OS Maps (Leisure & Road)', icon: 'map' },
+            { id: 'bing_os', name: 'Bing OS Legacy', icon: 'map' },
             { id: 'osm', name: 'OpenStreetMap', icon: 'globe' },
             { id: 'topo', name: 'OpenTopoMap', icon: 'mountain' },
             { id: 'aerial', name: 'Aerial (Esri)', icon: 'image' }
@@ -541,10 +829,33 @@
             origin: [ -238375.0, 1376256.0 ]
         });
 
+        // --- Custom Leaflet Layer for Bing OS Legacy ---
+        L.TileLayer.BingOS = L.TileLayer.extend({
+            getTileUrl: function (coords) {
+                let quadKey = '';
+                
+                for (let i = coords.z; i > 0; i--) {
+                    let digit = 0;
+                    let mask = 1 << (i - 1);
+                    
+                    if ((coords.x & mask) !== 0) digit += 1;
+                    if ((coords.y & mask) !== 0) digit += 2;
+                    
+                    quadKey += digit.toString();
+                }
+
+                const subdomains = ['0', '1', '2', '3'];
+                const s = subdomains[Math.abs(coords.x + coords.y) % subdomains.length];
+
+                return `https://ecn.t${s}.tiles.virtualearth.net/tiles/r${quadKey}?g=14397&lbl=l1&productSet=mmOS`;
+            }
+        });
+
         const mapLayers = {
             "osm": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }),
             "topo": L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '© OpenTopoMap' }),
-            "aerial": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Tiles © Esri' })
+            "aerial": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Tiles © Esri' }),
+            "bing_os": new L.TileLayer.BingOS('', { maxZoom: 18, maxNativeZoom: 15, attribution: 'Map data © Microsoft / Ordnance Survey' })
         };
 
         // --- OS Map Layer Generation ---
@@ -577,15 +888,57 @@
         async function initApp() {
             loadSettingsFromStorage();
             initMap();
+            initWarpImageMap();
             loadMarkersFromStorage();
             await loadOverlaysMeta();
             setupDrawerSwiping();
+            initSortableLists();
             
             lucide.createIcons();
             renderBaseMapsList();
             renderOverlayList();
             setupOverlayHoldControls();
             updateOpacitySliderVisibility();
+        }
+        
+        // --- Drag and Drop Sorting Init ---
+        function initSortableLists() {
+            Sortable.create(document.getElementById('base-map-list'), {
+                handle: '.drag-handle',
+                animation: 150,
+                onEnd: function (evt) {
+                    if (evt.oldIndex === evt.newIndex) return;
+                    const moved = baseMapDefs.splice(evt.oldIndex, 1)[0];
+                    baseMapDefs.splice(evt.newIndex, 0, moved);
+                    renderBaseMapsList(); // Resync DOM cleanly
+                }
+            });
+
+            Sortable.create(document.getElementById('marker-list'), {
+                handle: '.drag-handle',
+                animation: 150,
+                filter: '.no-drag',
+                onEnd: function (evt) {
+                    if (evt.oldIndex === evt.newIndex) return;
+                    const moved = markers.splice(evt.oldIndex, 1)[0];
+                    markers.splice(evt.newIndex, 0, moved);
+                    saveMarkersToStorage();
+                    renderMarkerList(); // Resync DOM cleanly
+                }
+            });
+
+            Sortable.create(document.getElementById('overlay-list'), {
+                handle: '.drag-handle',
+                animation: 150,
+                filter: '.no-drag',
+                onEnd: function (evt) {
+                    if (evt.oldIndex === evt.newIndex) return;
+                    const moved = overlays.splice(evt.oldIndex, 1)[0];
+                    overlays.splice(evt.newIndex, 0, moved);
+                    saveOverlaysMeta();
+                    renderOverlayList(); // Resync DOM cleanly
+                }
+            });
         }
 
         function initMap() {
@@ -602,7 +955,7 @@
                 options.crs = L.CRS.EPSG3857;
             }
             
-            map = L.map('map', options);
+            map = L.map('map', { ...options, maxBoundsViscosity: 0.5 });
             L.control.zoom({ position: 'topright' }).addTo(map);
             
             if (useOS) {
@@ -619,6 +972,17 @@
             
             window.addEventListener('click', requestOrientationPermission, { once: true });
             window.addEventListener('touchstart', requestOrientationPermission, { once: true });
+        }
+
+        function initWarpImageMap() {
+            warpImageMap = L.map('warp-image-map', {
+                crs: L.CRS.Simple,
+                minZoom: -3, maxZoom: 3,
+                zoomControl: false,
+                attributionControl: false
+            });
+            L.control.zoom({ position: 'bottomright' }).addTo(warpImageMap);
+            setupWarpImageMapListeners();
         }
 
         function rebuildMap(useOS) {
@@ -661,9 +1025,13 @@
             }
 
             if (activeOverlayImgBlob) {
-                const opacity = imgOpacity / 100;
-                leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation }).addTo(map);
-                renderLeafletOverlay();
+                if (overlayMode === 'warp' && warpPoints.length >= 3) {
+                    renderRubberSheetOverlay();
+                } else if (overlayMode === 'standard') {
+                    const opacity = imgOpacity / 100;
+                    leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation }).addTo(map);
+                    renderLeafletOverlay();
+                }
             }
         }
 
@@ -698,10 +1066,39 @@
                     setupPanelUI('overlay', document.getElementById('edit-item-id').value);
                     animateMapSqueeze(true);
                     updateOpacitySliderVisibility();
+                } else if (isBottomPanelOpen && document.getElementById('edit-item-type').value === 'overlay' && overlayMode === 'warp') {
+                    // Warp point setting click inside main map
+                    if (currentWarpStep !== 'map') return;
+                    
+                    const pointIdx = warpPoints.length - 1;
+                    const icon = L.divIcon({
+                        className: 'custom-div-icon',
+                        html: `<div class='map-marker-icon' style='width:22px; height:22px;'>${pointIdx + 1}</div>`,
+                        iconSize: [22, 22],
+                        iconAnchor: [11, 11]
+                    });
+                    
+                    const marker = L.marker(e.latlng, { icon: icon, draggable: true }).addTo(map);
+                    
+                    marker.on('drag', function(ev) {
+                        const index = mapMarkers.indexOf(ev.target);
+                        if (index !== -1) {
+                            warpPoints[index].map = ev.target.getLatLng();
+                            if (warpPoints.length >= 3) renderRubberSheetOverlay();
+                        }
+                    });
+                    
+                    mapMarkers.push(marker);
+                    warpPoints[pointIdx].map = e.latlng;
+                    currentWarpStep = 'img';
+                    updateWarpUI();
+                    
+                    if (warpPoints.length >= 3) renderRubberSheetOverlay();
                 }
             });
 
             map.on('move', () => {
+                if (isMapAnimating) return;
                 if (isBottomPanelOpen && document.getElementById('edit-item-type').value === 'point' && document.getElementById('coord-format').value === 'map') {
                     const center = map.getCenter();
                     tempPickedCoords = center;
@@ -709,6 +1106,7 @@
                 }
             });
             map.on('moveend', () => {
+                if (isMapAnimating) return;
                 if (isBottomPanelOpen && document.getElementById('edit-item-type').value === 'point' && document.getElementById('coord-format').value === 'map') {
                     const center = map.getCenter();
                     document.getElementById('dd-lat').value = center.lat.toFixed(6);
@@ -718,6 +1116,79 @@
                 saveMapState();
             });
             map.on('zoomend', saveMapState);
+        }
+
+        // --- Warp Image Map setup ---
+        function setupWarpImageMapListeners() {
+            warpImageMap.on('click', function(e) {
+                if (!activeOverlayImgBlob) return;
+                if (currentWarpStep !== 'img') return;
+
+                let x = e.latlng.lng, y = -e.latlng.lat; 
+                if (x < 0 || y < 0 || x > calImgObj.naturalWidth || y > calImgObj.naturalHeight) return;
+
+                const pointIdx = warpPoints.length;
+                const icon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `<div class='img-marker-icon' style='width:22px; height:22px;'>${pointIdx + 1}</div>`,
+                    iconSize: [22, 22],
+                    iconAnchor: [11, 11]
+                });
+                
+                const marker = L.marker([e.latlng.lat, e.latlng.lng], { icon: icon, draggable: true }).addTo(warpImageMap);
+
+                marker.on('drag', function(ev) {
+                    const index = imgMarkers.indexOf(ev.target);
+                    if (index !== -1) {
+                        const currentLatLng = ev.target.getLatLng();
+                        warpPoints[index].img.x = currentLatLng.lng;
+                        warpPoints[index].img.y = -currentLatLng.lat;
+                        if (warpPoints.length >= 3) renderRubberSheetOverlay();
+                    }
+                });
+
+                imgMarkers.push(marker);
+                warpPoints.push({ img: {x, y}, map: null });
+                currentWarpStep = 'map';
+                updateWarpUI();
+            });
+        }
+
+        function updateWarpUI() {
+            const counter = document.getElementById('warp-point-counter');
+            const instr = document.getElementById('warp-instruction');
+            if (counter) counter.innerText = warpPoints.length;
+            
+            if (instr) {
+                if (currentWarpStep === 'img') {
+                    instr.innerText = `Step ${warpPoints.length + 1}: Tap point on bottom Image`;
+                } else {
+                    instr.innerText = `Step ${warpPoints.length}: Tap matching location on Map`;
+                }
+            }
+        }
+
+        function undoLastWarpPoint() {
+            if (warpPoints.length === 0) return;
+            warpPoints.pop();
+            const lastImgMkr = imgMarkers.pop(); if (lastImgMkr) warpImageMap.removeLayer(lastImgMkr);
+            
+            if (currentWarpStep === 'img') {
+                const lastMapMkr = mapMarkers.pop(); if (lastMapMkr) map.removeLayer(lastMapMkr);
+            } else {
+                currentWarpStep = 'img';
+            }
+            updateWarpUI();
+            if (warpPoints.length >= 3) renderRubberSheetOverlay();
+            else removeRubberSheetOverlay();
+        }
+
+        function clearWarpPoints() {
+            warpPoints = [];
+            currentWarpStep = 'img';
+            removeAllWarpMarkers();
+            updateWarpUI();
+            removeRubberSheetOverlay();
         }
 
         // --- Drawer UI & Swiping ---
@@ -796,13 +1267,16 @@
                 const pulse = isActive ? '<span class="w-1.5 h-1.5 bg-blue-600 rounded-full flex-shrink-0 animate-pulse mr-2"></span>' : '';
                 return `
                     <div class="p-2 relative border-b border-gray-100 last:border-0 transition ${activeClass}">
-                        <div class="flex items-center justify-between gap-2 cursor-pointer py-1" onclick="changeBaseMap('${m.id}')">
-                            <div class="flex items-center gap-2 min-w-0">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center min-w-0 flex-grow gap-2 cursor-pointer" onclick="changeBaseMap('${m.id}')">
+                                <i data-lucide="grip-vertical" class="drag-handle w-4 h-4 text-gray-400 cursor-grab shrink-0 hover:text-gray-600"></i>
                                 ${pulse}
                                 <span class="text-sm font-bold text-gray-800 truncate">${m.name}</span>
                             </div>
-                            <div class="flex items-center space-x-1 shrink-0 p-1">
-                                <i data-lucide="${m.icon}" class="w-4 h-4 text-gray-500"></i>
+                            <div class="flex items-center space-x-1 shrink-0 bg-gray-50 rounded-lg p-0.5">
+                                <button onclick="changeBaseMap('${m.id}')" class="p-1 hover:bg-gray-200 rounded transition" title="Select Map">
+                                    <i data-lucide="${m.icon}" class="w-4 h-4 ${isActive ? 'text-blue-600' : 'text-gray-500'}"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -828,6 +1302,7 @@
                 
                 // Keep active items on top natively without custom panes
                 if (leafletImageOverlay) leafletImageOverlay.bringToFront();
+                if (leafletRubberSheetOverlay) leafletRubberSheetOverlay.bringToFront();
                 if (navPolyline) navPolyline.bringToFront();
             }
             saveMapState();
@@ -848,15 +1323,14 @@
             overlay.classList.add('modal-fade-in');
             overlay.style.pointerEvents = '';
 
-            ['settings-modal','confirm-modal','alert-modal','compass-modal', 'add-menu-modal'].forEach(modalId => {
+            ['settings-modal','confirm-modal','alert-modal','compass-modal', 'add-menu-modal', 'crop-modal'].forEach(modalId => {
                 const el = document.getElementById(modalId);
                 if (el) { el.classList.add('hidden'); el.style.display = 'none'; }
             });
 
             const modal = document.getElementById(id);
             modal.classList.remove('hidden');
-            if (id === 'add-menu-modal') modal.style.display = 'flex'; 
-            else modal.style.display = 'flex';
+            modal.style.display = 'flex';
             
             lucide.createIcons();
         }
@@ -866,7 +1340,7 @@
             overlay.classList.remove('modal-fade-in');
             overlay.classList.add('modal-fade-out');
             closeModalsTimeout = setTimeout(() => {
-                ['settings-modal','confirm-modal','alert-modal','compass-modal', 'add-menu-modal'].forEach(modalId => {
+                ['settings-modal','confirm-modal','alert-modal','compass-modal', 'add-menu-modal', 'crop-modal'].forEach(modalId => {
                     const el = document.getElementById(modalId);
                     if (el) { el.classList.add('hidden'); el.style.display = ''; }
                 });
@@ -881,19 +1355,36 @@
 
         // --- Bottom Panel General (Points & Overlays) ---
         function animateMapSqueeze(isOpening, targetLatLng = null) {
+            const centerToLock = map.getCenter(); 
+            const currentZoom = map.getZoom();
+            
+            isMapAnimating = true;
+            
             const start = performance.now();
             const step = () => {
                 map.invalidateSize({ pan: false });
-                if (performance.now() - start < 350) requestAnimationFrame(step);
+                
+                // Rigidly lock the geographical coordinate to the physical center of the map container
+                // This keeps the crosshair pointed exactly at the location it was previously pointing at
+                if (!targetLatLng) {
+                    map.setView(centerToLock, currentZoom, { animate: false });
+                }
+                
+                if (performance.now() - start < 350) {
+                    requestAnimationFrame(step);
+                } else {
+                    isMapAnimating = false;
+                    map.invalidateSize({ pan: false });
+                    if (!targetLatLng) map.setView(centerToLock, currentZoom, { animate: false });
+                }
             };
             requestAnimationFrame(step); 
 
             if (targetLatLng) {
+                // If the user requested to view a specific point, fly to it after layout adjusts
                 setTimeout(() => {
                     map.flyTo(targetLatLng, map.getZoom(), { animate: true, duration: 0.5 });
-                }, 300);
-            } else {
-                map.panBy([0, isOpening ? 190 : -190], { animate: true, duration: 0.3 });
+                }, 350);
             }
         }
 
@@ -913,48 +1404,63 @@
         }
 
         function closeBottomPanel() {
-            document.getElementById('map').classList.remove('map-squeezed');
-            document.getElementById('ui-layer').classList.remove('map-squeezed');
+            document.getElementById('map').classList.remove('map-squeezed', 'map-squeezed-advanced');
+            document.getElementById('ui-layer').classList.remove('map-squeezed', 'map-squeezed-advanced');
             document.getElementById('bottom-panel').classList.remove('panel-open');
+            document.getElementById('bottom-panel').style.height = ''; // Reset height to default
             document.getElementById('bottom-panel').classList.add('panel-closed');
             isBottomPanelOpen = false;
+
+            removeAllWarpMarkers(); // Safely purge markers when closing
             animateMapSqueeze(false);
             updateOpacitySliderVisibility();
         }
 
         function openPanelForNew(type) {
             if (window.innerWidth < 768) closeDrawerIfOpen();
+            overlayMode = 'standard'; // Default new is standard mode
+
+            if (type === 'overlay') {
+                unloadOverlay(); // Guarantees a clean blank slate state
+                imgWidthLng = 0; 
+            }
+
             setupPanelUI(type, null);
             animateMapSqueeze(true);
-            
-            if (type === 'overlay') {
-                imgWidthLng = 0; 
-                document.getElementById('overlay-file-input').click();
-            }
             updateOpacitySliderVisibility();
         }
 
         function openPanelForEdit(type, id) {
             if (window.innerWidth < 768) closeDrawerIfOpen();
-            setupPanelUI(type, id);
             
             isAutoCentering = false;
             updateCenterButtonUI();
+
+            setupPanelUI(type, id);
             
             if (type === 'point') {
                 const m = markers.find(x => x.id === id);
                 if (m) animateMapSqueeze(true, [m.lat, m.lng]);
             } else {
-                animateMapSqueeze(true, [imgCenter.lat, imgCenter.lng]);
+                if (overlayMode === 'warp' && warpPoints.length > 0) {
+                    const validPts = warpPoints.filter(p => p.map);
+                    if (validPts.length > 0) animateMapSqueeze(true, [validPts[0].map.lat, validPts[0].map.lng]);
+                    else animateMapSqueeze(true);
+                } else {
+                    animateMapSqueeze(true, [imgCenter.lat, imgCenter.lng]);
+                }
             }
             updateOpacitySliderVisibility();
         }
 
         function setupPanelUI(type, editId) {
             isBottomPanelOpen = true;
-            document.getElementById('map').classList.add('map-squeezed');
-            document.getElementById('ui-layer').classList.add('map-squeezed');
-            document.getElementById('bottom-panel').classList.replace('panel-closed', 'panel-open');
+            
+            const bPanel = document.getElementById('bottom-panel');
+            const mapContainer = document.getElementById('map');
+            const uiLayer = document.getElementById('ui-layer');
+
+            bPanel.classList.replace('panel-closed', 'panel-open');
 
             document.getElementById('edit-item-type').value = type;
             document.getElementById('edit-item-id').value = editId || '';
@@ -965,6 +1471,12 @@
             const delBtn = document.getElementById('panel-delete-btn');
 
             if (type === 'point') {
+                bPanel.style.height = ''; // Reset height
+                mapContainer.classList.add('map-squeezed');
+                mapContainer.classList.remove('map-squeezed-advanced');
+                uiLayer.classList.add('map-squeezed');
+                uiLayer.classList.remove('map-squeezed-advanced');
+
                 pContent.classList.remove('hidden'); oContent.classList.add('hidden');
                 document.getElementById('name-label').innerText = 'Point Name / Label';
                 
@@ -980,7 +1492,11 @@
                     document.getElementById('picked-coords-display').innerText = `${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}`;
                     document.getElementById('dd-lat').value = m.lat.toFixed(6);
                     document.getElementById('dd-lng').value = m.lng.toFixed(6);
+                    
+                    let tempAnim = isMapAnimating;
+                    isMapAnimating = true; // Suspend map view updates while setting UI
                     syncCoords('dd');
+                    isMapAnimating = tempAnim;
                 } else {
                     nameInput.value = '';
                     document.getElementById('panel-title').innerText = 'Add New Point';
@@ -992,7 +1508,11 @@
                     document.getElementById('picked-coords-display').innerText = `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
                     document.getElementById('dd-lat').value = center.lat.toFixed(6);
                     document.getElementById('dd-lng').value = center.lng.toFixed(6);
+                    
+                    let tempAnim = isMapAnimating;
+                    isMapAnimating = true; // Suspend map view updates while setting UI
                     syncCoords('dd');
+                    isMapAnimating = tempAnim;
                 }
                 updateCoordInputs();
                 
@@ -1000,6 +1520,8 @@
                 pContent.classList.add('hidden'); oContent.classList.remove('hidden');
                 document.getElementById('name-label').innerText = 'Overlay Map Name';
                 
+                removeAllWarpMarkers(); // Aggressive clean up on panel switch
+
                 if (editId) {
                     const o = overlays.find(x => x.id === editId);
                     nameInput.value = o ? o.name : '';
@@ -1013,9 +1535,16 @@
                     document.getElementById('panel-title').innerText = 'New Image Overlay';
                     delBtn.classList.add('hidden');
                     
+                    // ONLY clear memory references when starting a NEW overlay map
+                    warpPoints = [];
+                    currentWarpStep = 'img';
+
                     imgOpacity = 60;
                     syncOpacitySlider();
                 }
+
+                // Restore dynamic advanced mode UI settings based on state
+                updateAdvancedWarpLayout();
             }
         }
 
@@ -1035,6 +1564,8 @@
             try { await idbKeyval.set('overlays_meta', overlays); } catch(e) {}
         }
 
+        // --- CROPPING PRE-PROCESSOR HOOKS ---
+
         document.getElementById('overlay-file-input').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) {
@@ -1042,54 +1573,111 @@
                 return;
             }
             
-            activeOverlayImgBlob = file;
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const cropImg = document.getElementById('image-to-crop');
+                cropImg.src = event.target.result;
+                
+                showModal('crop-modal');
+                
+                if (cropper) { cropper.destroy(); }
+                cropper = new Cropper(cropImg, {
+                    viewMode: 1,
+                    dragMode: 'crop',
+                    autoCropArea: 0.9,
+                    responsive: true,
+                    background: true,
+                    checkOrientation: false
+                });
+            };
+            reader.readAsDataURL(file);
+            e.target.value = ''; // Reset file selector so same image can trigger crop sequence again
+        });
+
+        function closeCropModal() {
+            closeModals();
+            if (cropper) {
+                cropper.destroy();
+                cropper = null;
+            }
+        }
+
+        function applyCrop() {
+            if (!cropper) return;
+            
+            const canvas = cropper.getCroppedCanvas();
+            canvas.toBlob((blob) => {
+                closeCropModal();
+                loadProcessedImageToWorkspace(blob);
+            }, 'image/png');
+        }
+
+        function loadProcessedImageToWorkspace(blob) {
+            activeOverlayImgBlob = blob;
             if (activeOverlayBlobUrl) URL.revokeObjectURL(activeOverlayBlobUrl);
-            activeOverlayBlobUrl = URL.createObjectURL(file);
+            activeOverlayBlobUrl = URL.createObjectURL(blob);
 
             calImgObj = new Image();
             calImgObj.src = activeOverlayBlobUrl;
             calImgObj.onload = () => {
                 const isNew = !document.getElementById('edit-item-id').value;
-                if (isNew || imgWidthLng === 0) {
-                    imgWidthLng = 0; 
-                    isPlacingOverlay = true;
-                    
-                    // Temporarily hide the panel to give a full view for placement
-                    document.getElementById('bottom-panel').classList.replace('panel-open', 'panel-closed');
-                    document.getElementById('map').classList.remove('map-squeezed');
-                    document.getElementById('ui-layer').classList.remove('map-squeezed');
-                    isBottomPanelOpen = false;
-                    updateOpacitySliderVisibility();
 
-                    document.getElementById('map-instruction-overlay').classList.remove('hidden');
-                    document.getElementById('map').classList.add('map-placing-overlay');
-                    lucide.createIcons();
+                // Load image into warp workspace map immediately
+                document.getElementById('warp-image-placeholder').classList.add('hidden');
+                if (warpImageLayer) warpImageMap.removeLayer(warpImageLayer);
+                
+                const w = calImgObj.naturalWidth, h = calImgObj.naturalHeight;
+                const bounds = [[-h, 0], [0, w]]; 
+                warpImageLayer = L.imageOverlay(activeOverlayBlobUrl, bounds).addTo(warpImageMap);
+                warpImageMap.fitBounds(bounds);
+                setTimeout(() => warpImageMap.invalidateSize(), 200);
+
+                if (overlayMode === 'standard') {
+                    if (isNew || imgWidthLng === 0) {
+                        imgWidthLng = 0; 
+                        isPlacingOverlay = true;
+                        
+                        // Temporarily hide the panel to give a full view for placement
+                        document.getElementById('bottom-panel').classList.replace('panel-open', 'panel-closed');
+                        document.getElementById('map').classList.remove('map-squeezed', 'map-squeezed-advanced');
+                        document.getElementById('ui-layer').classList.remove('map-squeezed', 'map-squeezed-advanced');
+                        isBottomPanelOpen = false;
+                        updateOpacitySliderVisibility();
+
+                        document.getElementById('instruction-overlay-text').innerText = "Click map to place image center.";
+                        document.getElementById('map-instruction-overlay').classList.remove('hidden');
+                        document.getElementById('map').classList.add('map-placing-overlay');
+                        lucide.createIcons();
+                    } else {
+                        const aspect = calImgObj.naturalWidth / calImgObj.naturalHeight;
+                        imgHeightLat = (imgWidthLng * Math.cos(imgCenter.lat * Math.PI / 180)) / aspect;
+                        
+                        if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
+                        const opacity = imgOpacity / 100;
+                        leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation }).addTo(map);
+                        renderLeafletOverlay();
+                        updateOpacitySliderVisibility();
+                    }
                 } else {
-                    const aspect = calImgObj.naturalWidth / calImgObj.naturalHeight;
-                    imgHeightLat = (imgWidthLng * Math.cos(imgCenter.lat * Math.PI / 180)) / aspect;
-                    
-                    if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
-                    const opacity = imgOpacity / 100;
-                    leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation }).addTo(map);
-                    renderLeafletOverlay();
-                    updateOpacitySliderVisibility();
+                    // Warp mode: Clear points as image has changed
+                    clearWarpPoints();
                 }
             };
-            e.target.value = ''; // Reset file selector
-        });
+        }
 
         function triggerOverlayReselect() {
             oldImgCenterBackup = L.latLng(imgCenter.lat, imgCenter.lng);
             isPlacingOverlay = true;
             
             document.getElementById('bottom-panel').classList.replace('panel-open', 'panel-closed');
-            document.getElementById('map').classList.remove('map-squeezed');
-            document.getElementById('ui-layer').classList.remove('map-squeezed');
+            document.getElementById('map').classList.remove('map-squeezed', 'map-squeezed-advanced');
+            document.getElementById('ui-layer').classList.remove('map-squeezed', 'map-squeezed-advanced');
             isBottomPanelOpen = false;
             
             animateMapSqueeze(false);
             updateOpacitySliderVisibility();
 
+            document.getElementById('instruction-overlay-text').innerText = "Click map to place image center.";
             document.getElementById('map-instruction-overlay').classList.remove('hidden');
             document.getElementById('map').classList.add('map-placing-overlay');
             lucide.createIcons();
@@ -1123,6 +1711,150 @@
             leafletImageOverlay.setBounds(bounds);
             leafletImageOverlay.setAngle(imgRotation);
             leafletImageOverlay.setOpacity(imgOpacity / 100);
+        }
+
+        // --- Toggle Advanced Warp Mode ---
+        function toggleAdvancedWarpMode() {
+            overlayMode = overlayMode === 'standard' ? 'warp' : 'standard';
+            
+            // Re-render and configure active layers cleanly
+            if (overlayMode === 'standard') {
+                removeRubberSheetOverlay();
+                if (activeOverlayBlobUrl && imgCenter) {
+                    if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
+                    leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity: imgOpacity/100, interactive: false, angle: imgRotation }).addTo(map);
+                    renderLeafletOverlay();
+                }
+            } else {
+                if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
+                if (warpPoints.length >= 3) {
+                    renderRubberSheetOverlay();
+                }
+            }
+            
+            updateAdvancedWarpLayout();
+            animateMapSqueeze(true);
+        }
+
+        function updateAdvancedWarpLayout() {
+            const bPanel = document.getElementById('bottom-panel');
+            const mapContainer = document.getElementById('map');
+            const uiLayer = document.getElementById('ui-layer');
+
+            const advBtn = document.getElementById('btn-toggle-advanced-mode');
+            const advBtnText = document.getElementById('text-toggle-advanced-mode');
+            const centerBtn = document.getElementById('btn-trigger-reselect');
+            
+            const stdBlock = document.getElementById('overlay-standard-controls');
+            const advBlock = document.getElementById('overlay-advanced-controls');
+
+            if (overlayMode === 'warp') {
+                advBtnText.innerText = "Warp ON";
+                advBtn.classList.replace('bg-gray-100', 'bg-blue-600');
+                advBtn.classList.replace('text-gray-700', 'text-white');
+                advBtn.classList.replace('border-gray-200', 'border-blue-700');
+                
+                centerBtn.classList.add('opacity-50', 'pointer-events-none');
+                
+                stdBlock.classList.add('hidden');
+                advBlock.classList.remove('hidden');
+
+                bPanel.style.height = '65vh'; // Expand height of editor for split view
+                mapContainer.classList.add('map-squeezed-advanced');
+                mapContainer.classList.remove('map-squeezed');
+                uiLayer.classList.add('map-squeezed-advanced');
+                uiLayer.classList.remove('map-squeezed');
+
+                setTimeout(() => {
+                    warpImageMap.invalidateSize();
+                    if (warpImageLayer) {
+                        const bounds = [[-calImgObj.naturalHeight, 0], [0, calImgObj.naturalWidth]]; 
+                        warpImageMap.fitBounds(bounds);
+                    }
+                }, 300);
+
+                // Render dynamic control points if editable
+                rebuildWarpMarkersOnMap();
+
+            } else {
+                advBtnText.innerText = "Warp OFF";
+                advBtn.classList.replace('bg-blue-600', 'bg-gray-100');
+                advBtn.classList.replace('text-white', 'text-gray-700');
+                advBtn.classList.replace('border-blue-700', 'border-gray-200');
+
+                centerBtn.classList.remove('opacity-50', 'pointer-events-none');
+
+                stdBlock.classList.remove('hidden');
+                advBlock.classList.add('hidden');
+
+                bPanel.style.height = ''; // Squeeze back down
+                mapContainer.classList.add('map-squeezed');
+                mapContainer.classList.remove('map-squeezed-advanced');
+                uiLayer.classList.add('map-squeezed');
+                uiLayer.classList.remove('map-squeezed-advanced');
+
+                removeAllWarpMarkers();
+            }
+        }
+
+        function rebuildWarpMarkersOnMap() {
+            removeAllWarpMarkers();
+
+            warpPoints.forEach((pt, index) => {
+                // Add Image map marker
+                const imgIcon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `<div class='img-marker-icon' style='width:22px; height:22px;'>${index + 1}</div>`,
+                    iconSize: [22, 22],
+                    iconAnchor: [11, 11]
+                });
+                const imgMkr = L.marker([pt.img.y ? -pt.img.y : 0, pt.img.x], { icon: imgIcon, draggable: true }).addTo(warpImageMap);
+                imgMkr.on('drag', function(ev) {
+                    const currentLatLng = ev.target.getLatLng();
+                    warpPoints[index].img.x = currentLatLng.lng;
+                    warpPoints[index].img.y = -currentLatLng.lat;
+                    if (warpPoints.length >= 3) renderRubberSheetOverlay();
+                });
+                imgMarkers.push(imgMkr);
+
+                // Add main map marker
+                if (pt.map) {
+                    const mapIcon = L.divIcon({
+                        className: 'custom-div-icon',
+                        html: `<div class='map-marker-icon' style='width:22px; height:22px;'>${index + 1}</div>`,
+                        iconSize: [22, 22],
+                        iconAnchor: [11, 11]
+                    });
+                    const mapMkr = L.marker(pt.map, { icon: mapIcon, draggable: true }).addTo(map);
+                    mapMkr.on('drag', function(ev) {
+                        warpPoints[index].map = ev.target.getLatLng();
+                        if (warpPoints.length >= 3) renderRubberSheetOverlay();
+                    });
+                    mapMarkers.push(mapMkr);
+                }
+            });
+
+            updateWarpUI();
+        }
+
+        function renderRubberSheetOverlay() {
+            if (!activeOverlayBlobUrl || warpPoints.length < 3) return;
+            
+            // Extract valid points that have both image and map coordinates
+            const validPts = warpPoints.filter(p => p.map !== null);
+            if (validPts.length < 3) return;
+
+            removeRubberSheetOverlay();
+            
+            leafletRubberSheetOverlay = new L.RubberSheetOverlay(calImgObj, validPts, { opacity: imgOpacity / 100 });
+            leafletRubberSheetOverlay.addTo(map);
+        }
+
+        function removeRubberSheetOverlay() {
+            if (leafletRubberSheetOverlay) {
+                map.removeLayer(leafletRubberSheetOverlay);
+                leafletRubberSheetOverlay = null;
+            }
         }
 
         // Fine Controls setup
@@ -1159,7 +1891,12 @@
             document.getElementById('floating-opacity-slider').addEventListener('input', (e) => {
                 imgOpacity = e.target.value;
                 document.getElementById('floating-opacity-val').innerText = imgOpacity + '%';
-                renderLeafletOverlay();
+                
+                if (overlayMode === 'warp') {
+                    if (leafletRubberSheetOverlay) leafletRubberSheetOverlay.setOpacity(imgOpacity / 100);
+                } else {
+                    renderLeafletOverlay();
+                }
             });
         }
 
@@ -1187,6 +1924,13 @@
 
         async function saveOverlay() {
             if (!activeOverlayImgBlob) { showAlert("Missing Image", "Please choose an image file for this overlay."); return; }
+            
+            // Require at least 3 control points to save in warp mode
+            if (overlayMode === 'warp' && warpPoints.filter(p => p.map !== null).length < 3) {
+                showAlert("Warp Points Needed", "Warping requires at least 3 completed control points mapping the image to the layout map.");
+                return;
+            }
+
             const name = document.getElementById('item-name').value.trim() || 'Untitled Overlay';
             const editId = document.getElementById('edit-item-id').value;
             const id = editId || 'ov_' + Date.now();
@@ -1199,11 +1943,23 @@
                 return;
             }
 
+            // Standard calibration configuration
+            const calibration = {
+                lat: imgCenter ? imgCenter.lat : map.getCenter().lat,
+                lng: imgCenter ? imgCenter.lng : map.getCenter().lng,
+                width: imgWidthLng,
+                height: imgHeightLat,
+                rotation: imgRotation,
+                opacity: imgOpacity
+            };
+
             const payload = {
                 id, name, 
                 imageBuffer: imageBuffer,
                 imageType: activeOverlayImgBlob.type,
-                calibration: { lat: imgCenter.lat, lng: imgCenter.lng, width: imgWidthLng, height: imgHeightLat, rotation: imgRotation, opacity: imgOpacity },
+                mode: overlayMode, // 'standard' or 'warp'
+                calibration: calibration,
+                warpPoints: overlayMode === 'warp' ? warpPoints : [], // Serialize warp control points
                 savedView: {
                     lat: map.getCenter().lat,
                     lng: map.getCenter().lng,
@@ -1227,11 +1983,7 @@
                 updateOpacitySliderVisibility();
             } catch(e) { 
                 console.error("IndexedDB Save Failed", e);
-                if (e.name === 'SecurityError' || e.message.includes('SecurityError') || e.message.includes('partitioned')) {
-                    showAlert("Storage Blocked", "Your browser is blocking local database access. This is common when viewing within an iframe preview on Safari or using Private Browsing. Please open the app directly outside this frame or use Chrome.");
-                } else {
-                    showAlert("Save Failed", "Could not save overlay data: " + e.message);
-                }
+                showAlert("Save Failed", "Could not save overlay data: " + e.message);
             }
         }
 
@@ -1244,9 +1996,12 @@
                 if (!data) return;
 
                 if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
+                removeRubberSheetOverlay();
+                
                 if (activeOverlayBlobUrl) URL.revokeObjectURL(activeOverlayBlobUrl);
 
                 activeOverlayId = id;
+                overlayMode = data.mode || 'standard';
                 
                 let blob;
                 if (data.imageBuffer) {
@@ -1254,23 +2009,38 @@
                 } else if (data.imageBlob) {
                     blob = data.imageBlob;
                 } else {
-                    throw new Error("No image data found in local document database.");
+                    throw new Error("No image data found in local database.");
                 }
 
                 activeOverlayImgBlob = blob;
                 activeOverlayBlobUrl = URL.createObjectURL(blob);
 
+                // Load parameters
                 imgCenter = L.latLng(data.calibration.lat, data.calibration.lng);
                 imgWidthLng = data.calibration.width;
                 imgHeightLat = data.calibration.height;
                 imgRotation = data.calibration.rotation;
                 imgOpacity = data.calibration.opacity || 60;
+                warpPoints = data.warpPoints || [];
+                currentWarpStep = 'img';
 
                 calImgObj = new Image();
                 calImgObj.src = activeOverlayBlobUrl;
+                calImgObj.onload = () => {
+                    // Populate warp workspace image map
+                    document.getElementById('warp-image-placeholder').classList.add('hidden');
+                    if (warpImageLayer) warpImageMap.removeLayer(warpImageLayer);
+                    const bounds = [[-calImgObj.naturalHeight, 0], [0, calImgObj.naturalWidth]]; 
+                    warpImageLayer = L.imageOverlay(activeOverlayBlobUrl, bounds).addTo(warpImageMap);
+                    
+                    if (overlayMode === 'warp') {
+                        renderRubberSheetOverlay();
+                    } else {
+                        leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity: imgOpacity/100, interactive: false, angle: imgRotation }).addTo(map);
+                        renderLeafletOverlay();
+                    }
+                };
 
-                leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity: imgOpacity/100, interactive: false, angle: imgRotation }).addTo(map);
-                renderLeafletOverlay();
                 syncOpacitySlider();
                 
                 // Re-center map back to saved perspective if available
@@ -1327,8 +2097,22 @@
         function unloadOverlay() {
             if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
             leafletImageOverlay = null;
+            removeRubberSheetOverlay();
+
+            if (warpImageLayer) {
+                warpImageMap.removeLayer(warpImageLayer);
+                warpImageLayer = null;
+            }
+            document.getElementById('warp-image-placeholder')?.classList.remove('hidden');
+
             activeOverlayId = null;
             activeOverlayImgBlob = null;
+            warpPoints = [];
+            currentWarpStep = 'img';
+
+            removeAllWarpMarkers();
+            updateWarpUI();
+
             if (activeOverlayBlobUrl) { URL.revokeObjectURL(activeOverlayBlobUrl); activeOverlayBlobUrl = null; }
             
             isPlacingOverlay = false;
@@ -1344,7 +2128,7 @@
             list.innerHTML = '';
             
             if (overlays.length === 0) {
-                list.innerHTML = '<div class="text-center text-xs text-gray-500 mt-6">No overlays saved yet.</div>';
+                list.innerHTML = '<div class="text-center text-xs text-gray-500 mt-6 no-drag">No overlays saved yet.</div>';
                 return;
             }
 
@@ -1357,9 +2141,12 @@
                 
                 item.innerHTML = `
                     <div class="flex items-center justify-between gap-2">
-                        <div class="flex-grow cursor-pointer flex items-center overflow-hidden min-w-0" onclick="activateOverlay('${o.id}')">
-                            ${pulse}
-                            <span class="text-sm font-bold text-gray-800 truncate">${escapeHTML(o.name)}</span>
+                        <div class="flex items-center min-w-0 flex-grow gap-2">
+                            <i data-lucide="grip-vertical" class="drag-handle w-4 h-4 text-gray-400 cursor-grab shrink-0 hover:text-gray-600"></i>
+                            <div class="flex-grow cursor-pointer flex items-center overflow-hidden min-w-0" onclick="activateOverlay('${o.id}')">
+                                ${pulse}
+                                <span class="text-sm font-bold text-gray-800 truncate">${escapeHTML(o.name)}</span>
+                            </div>
                         </div>
                         <div class="flex items-center space-x-1 shrink-0 bg-gray-50 rounded-lg p-0.5">
                             <button onclick="centerOnOverlay('${o.id}')" class="p-1 hover:bg-gray-200 rounded text-gray-700 transition" title="Go to Saved View"><i data-lucide="crosshair" class="w-4 h-4"></i></button>
@@ -1462,7 +2249,7 @@
                     isVisible: true
                 };
                 newM.leafletMarker = createLeafletMarker(newM);
-                markers.push(newM);
+                markers.unshift(newM); // Add to the top of the array
             }
 
             saveMarkersToStorage(); 
@@ -1472,14 +2259,18 @@
 
         function toggleAllPointsVisibility() {
             if (markers.length === 0) return;
-            const hasVisible = markers.some(m => m.isVisible);
+            
+            // Filter out the active navigation marker to determine the state of the OTHERS
+            const nonNavMarkers = markers.filter(m => m.id !== navigatingToId);
+            if (nonNavMarkers.length === 0) return; // Nothing to toggle if the only point is the nav target
+            
+            const hasVisibleOthers = nonNavMarkers.some(m => m.isVisible);
+            const targetVisibility = !hasVisibleOthers;
             
             markers.forEach(m => {
-                if (hasVisible && navigatingToId === m.id) {
-                    m.isVisible = true; // active nav marker remains visible
-                    return;
-                }
-                m.isVisible = !hasVisible;
+                if (navigatingToId === m.id) return; // Skip the active navigation marker completely
+                
+                m.isVisible = targetVisibility;
                 if (m.isVisible) {
                     if (!map.hasLayer(m.leafletMarker)) m.leafletMarker.addTo(map);
                 } else {
@@ -1496,7 +2287,15 @@
             const btnIcon = document.querySelector('#btn-toggle-all-points i');
             if (!btnText) return;
 
-            const hasVisible = markers.some(m => m.isVisible);
+            const nonNavMarkers = markers.filter(m => m.id !== navigatingToId);
+            let hasVisible = false;
+            
+            if (nonNavMarkers.length > 0) {
+                hasVisible = nonNavMarkers.some(m => m.isVisible);
+            } else if (markers.length > 0) {
+                hasVisible = markers[0].isVisible;
+            }
+
             btnText.innerText = hasVisible ? "Hide All" : "Show All";
             if (btnIcon) {
                 btnIcon.setAttribute('data-lucide', hasVisible ? 'eye-off' : 'eye');
@@ -1563,7 +2362,7 @@
                 html: `
                     <div id="user-heading-container" class="absolute pointer-events-none transition-transform duration-100 ease-out" style="width: 60px; height: 60px; top: -22px; left: -22px; transform-origin: 30px 30px; display: none;">
                         <svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-md">
-                            <path d="M 50 15 L 65 50 Q 50 45 35 50 Z" fill="rgba(59, 130, 246, 0.4)" stroke="rgba(59, 130, 246, 0.8)" stroke-width="1.5"/>
+                            <path d="M 50 5 L 65 40 Q 50 35 35 40 Z" fill="rgba(59, 130, 246, 0.4)" stroke="rgba(59, 130, 246, 0.8)" stroke-width="1.5"/>
                         </svg>
                     </div>
                     <div class="user-location-marker w-4 h-4 relative z-10"></div>
@@ -1672,6 +2471,7 @@
             }
         }
 
+        // --- Marker UI ---
         function centerOnMarker(id) {
             isAutoCentering = false;
             updateCenterButtonUI();
@@ -1709,7 +2509,7 @@
             list.innerHTML = '';
             
             if (markers.length === 0) {
-                list.innerHTML = '<div class="text-center text-xs text-gray-500 mt-6">No points added yet.</div>';
+                list.innerHTML = '<div class="text-center text-xs text-gray-500 mt-6 no-drag">No points added yet.</div>';
                 updateToggleAllPointsUI();
                 return;
             }
@@ -1724,7 +2524,8 @@
                 
                 item.innerHTML = `
                     <div class="flex items-center justify-between gap-2">
-                        <div class="flex items-center gap-2 min-w-0">
+                        <div class="flex items-center min-w-0 flex-grow gap-2">
+                            <i data-lucide="grip-vertical" class="drag-handle w-4 h-4 text-gray-400 cursor-grab shrink-0 hover:text-gray-600"></i>
                             ${isNav ? '<i data-lucide="navigation-2" class="w-4 h-4 text-green-600 shrink-0"></i>' : ''}
                             <h4 class="text-sm font-bold text-gray-800 truncate">${escapeHTML(m.name)}</h4>
                         </div>
@@ -1867,7 +2668,7 @@
                 }
                 
                 if (source !== 'map' && isBottomPanelOpen) {
-                    map.setView([lat, lng]);
+                    if (!isMapAnimating) map.setView([lat, lng]);
                     document.getElementById('picked-coords-display').innerText = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
                     tempPickedCoords = {lat, lng};
                 }
@@ -1997,6 +2798,7 @@
                 
                 // Preserve stacking order natively
                 if (leafletImageOverlay) leafletImageOverlay.bringToFront();
+                if (leafletRubberSheetOverlay) leafletRubberSheetOverlay.bringToFront();
                 if (navPolyline) navPolyline.bringToFront();
             }
             
@@ -2032,8 +2834,16 @@
             localStorage.setItem('maverish_settings', JSON.stringify(settings));
         }
 
-        function openCompassModal() { showModal('compass-modal'); }
-        function escapeHTML(str) { return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)); }
+        function openCompassModal() { 
+            let title = "Heading";
+            if (navigatingToId) {
+                const target = markers.find(x => x.id === navigatingToId);
+                if (target) title = target.name;
+            }
+            document.getElementById('compass-modal-title').innerText = title;
+            showModal('compass-modal'); 
+        }
+        function escapeHTML(str) { return str.replace(/[&<>']/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)); }
 
         // Boot
         window.onload = () => {
