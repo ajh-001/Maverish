@@ -904,11 +904,21 @@
                 
                 for (let key of keys) {
                     if (localTileIndex[key]) {
-                        return localTileIndex[key];
+                        // Create temporary object URL for the tile dynamically
+                        return URL.createObjectURL(localTileIndex[key]);
                     }
                 }
                 // Fallback transparent empty pixel
                 return 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"></svg>';
+            }
+        });
+
+        const localTilesLayer = new L.TileLayer.LocalDirectory('', { maxZoom: 18, attribution: 'Local Directory Map Tiles (Maverick)' });
+        
+        // Unload URLs from memory when the tile goes off-screen to prevent memory leaks
+        localTilesLayer.on('tileunload', function(e) {
+            if (e.tile && e.tile.src && e.tile.src.startsWith('blob:')) {
+                URL.revokeObjectURL(e.tile.src);
             }
         });
 
@@ -917,7 +927,7 @@
             "topo": L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '© OpenTopoMap' }),
             "aerial": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Tiles © Esri' }),
             "bing_os": new L.TileLayer.BingOS('', { maxZoom: 18, maxNativeZoom: 15, attribution: 'Map data © Microsoft / Ordnance Survey' }),
-            "local_tiles": new L.TileLayer.LocalDirectory('', { maxZoom: 18, attribution: 'Local Directory Map Tiles (Maverick)' })
+            "local_tiles": localTilesLayer
         };
 
         // --- Init ---
@@ -992,12 +1002,7 @@
                 const files = e.target.files;
                 if (!files || files.length === 0) return;
 
-                // Revoke old object URLs first to prevent memory leak
-                for (let key in localTileIndex) {
-                    if (localTileIndex[key].startsWith('blob:')) {
-                        URL.revokeObjectURL(localTileIndex[key]);
-                    }
-                }
+                // Reset the file mapping index
                 localTileIndex = {};
 
                 let matchedCount = 0;
@@ -1028,7 +1033,8 @@
                     const ext = filename.substring(filename.indexOf('.')); // keeps ".png.tile" or ".tile"
                     const key = `${z}_${x}_${y}${ext}`;
 
-                    localTileIndex[key] = URL.createObjectURL(file);
+                    // Store the pure File object reference rather than creating thousands of ObjectURLs
+                    localTileIndex[key] = file;
                     matchedCount++;
                 }
 
@@ -1434,10 +1440,12 @@
                 return `
                     <div class="p-2 relative border-b border-gray-100 last:border-0 transition ${activeClass}">
                         <div class="flex items-center justify-between gap-2">
-                            <div class="flex items-center min-w-0 flex-grow gap-2 cursor-pointer" onclick="changeBaseMap('${m.id}')">
+                            <div class="flex items-center min-w-0 flex-grow gap-2">
                                 <i data-lucide="grip-vertical" class="drag-handle w-4 h-4 text-gray-400 cursor-grab shrink-0 hover:text-gray-600"></i>
-                                ${pulse}
-                                <span class="text-sm font-bold text-gray-800 truncate select-none">${m.name}</span>
+                                <div class="flex-grow cursor-pointer flex items-center overflow-hidden min-w-0" onclick="changeBaseMap('${m.id}')">
+                                    ${pulse}
+                                    <span class="text-sm font-bold text-gray-800 truncate select-none">${m.name}</span>
+                                </div>
                             </div>
                             <div class="flex items-center space-x-1 shrink-0 bg-gray-50 rounded-lg p-0.5">
                                 <button onclick="changeBaseMap('${m.id}')" class="p-1 hover:bg-gray-200 rounded transition" title="Select Map">
