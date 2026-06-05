@@ -120,6 +120,33 @@
         /* Drag handle highlight */
         .sortable-ghost { opacity: 0.4; }
         .drag-handle { touch-action: none; }
+
+        /* Custom Color Slider Styles */
+        .color-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+        }
+        .color-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid #6b7280; 
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        .color-slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid #6b7280;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
     </style>
 </head>
 <body class="text-gray-800 font-sans antialiased">
@@ -438,7 +465,7 @@
 
         <!-- Settings Modal -->
         <div id="settings-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col max-h-[90vh]">
-            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center shrink-0">
                 <h3 class="text-base font-bold text-gray-800">Settings</h3>
                 <button onclick="closeModals()" class="text-gray-400 hover:text-gray-600">
                     <i data-lucide="x" class="w-5 h-5"></i>
@@ -462,22 +489,69 @@
                         <option value="pin">Waterdrop Pin</option>
                     </select>
                 </div>
+                
+                <!-- Custom Marker Color Picker -->
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-2">Marker Color</label>
-                    <div class="flex items-center gap-3 bg-gray-50 border border-gray-300 rounded-lg p-2">
-                        <input type="color" id="setting-color" class="h-8 w-12 cursor-pointer rounded border-0 bg-transparent p-0">
-                        <span class="text-xs text-gray-600 font-medium">Select primary color</span>
+                    <div class="bg-gray-50 border border-gray-300 rounded-lg p-3">
+                        <div class="flex flex-wrap gap-2.5 mb-2" id="quick-colors-marker"></div>
+                        <button type="button" onclick="toggleCustomColor('marker')" class="text-[11px] font-bold text-gray-500 flex items-center gap-1 hover:text-gray-800 transition mt-3 outline-none">
+                            <i data-lucide="palette" class="w-3.5 h-3.5"></i> <span id="toggle-text-marker">Custom Color</span>
+                        </button>
+                        <div id="custom-panel-marker" class="hidden flex-col gap-3 mt-3 pt-3 border-t border-gray-200">
+                            <div class="flex items-center gap-3">
+                                <div id="preview-marker" class="w-8 h-8 rounded shadow-inner border border-gray-300 shrink-0"></div>
+                                <input type="text" id="hex-input-marker" class="flex-1 text-xs border border-gray-300 rounded p-1.5 font-mono uppercase text-gray-700 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-[10px] text-gray-500 font-bold mb-1"><span>Hue</span> <span id="val-h-marker">0°</span></div>
+                                <input type="range" id="slider-h-marker" min="0" max="360" class="w-full h-2 rounded-lg appearance-none outline-none color-slider" style="background: linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%);">
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-[10px] text-gray-500 font-bold mb-1"><span>Saturation</span> <span id="val-s-marker">100%</span></div>
+                                <input type="range" id="slider-s-marker" min="0" max="100" class="w-full h-2 rounded-lg appearance-none outline-none color-slider">
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-[10px] text-gray-500 font-bold mb-1"><span>Lightness</span> <span id="val-l-marker">50%</span></div>
+                                <input type="range" id="slider-l-marker" min="0" max="100" class="w-full h-2 rounded-lg appearance-none outline-none color-slider">
+                            </div>
+                        </div>
+                        <input type="hidden" id="setting-color" value="#ef4444">
                     </div>
                 </div>
+
+                <!-- Custom Navigation Line Color Picker -->
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-2">Navigation Line Color</label>
-                    <div class="flex items-center gap-3 bg-gray-50 border border-gray-300 rounded-lg p-2">
-                        <input type="color" id="setting-nav-color" class="h-8 w-12 cursor-pointer rounded border-0 bg-transparent p-0">
-                        <span class="text-xs text-gray-600 font-medium">Select active path color</span>
+                    <div class="bg-gray-50 border border-gray-300 rounded-lg p-3">
+                        <div class="flex flex-wrap gap-2.5 mb-2" id="quick-colors-nav"></div>
+                        <button type="button" onclick="toggleCustomColor('nav')" class="text-[11px] font-bold text-gray-500 flex items-center gap-1 hover:text-gray-800 transition mt-3 outline-none">
+                            <i data-lucide="palette" class="w-3.5 h-3.5"></i> <span id="toggle-text-nav">Custom Color</span>
+                        </button>
+                        <div id="custom-panel-nav" class="hidden flex-col gap-3 mt-3 pt-3 border-t border-gray-200">
+                            <div class="flex items-center gap-3">
+                                <div id="preview-nav" class="w-8 h-8 rounded shadow-inner border border-gray-300 shrink-0"></div>
+                                <input type="text" id="hex-input-nav" class="flex-1 text-xs border border-gray-300 rounded p-1.5 font-mono uppercase text-gray-700 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-[10px] text-gray-500 font-bold mb-1"><span>Hue</span> <span id="val-h-nav">0°</span></div>
+                                <input type="range" id="slider-h-nav" min="0" max="360" class="w-full h-2 rounded-lg appearance-none outline-none color-slider" style="background: linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%);">
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-[10px] text-gray-500 font-bold mb-1"><span>Saturation</span> <span id="val-s-nav">100%</span></div>
+                                <input type="range" id="slider-s-nav" min="0" max="100" class="w-full h-2 rounded-lg appearance-none outline-none color-slider">
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-[10px] text-gray-500 font-bold mb-1"><span>Lightness</span> <span id="val-l-nav">50%</span></div>
+                                <input type="range" id="slider-l-nav" min="0" max="100" class="w-full h-2 rounded-lg appearance-none outline-none color-slider">
+                            </div>
+                        </div>
+                        <input type="hidden" id="setting-nav-color" value="#2563eb">
                     </div>
                 </div>
+
             </div>
-            <div class="p-3 border-t border-gray-200 bg-gray-50 rounded-b-xl flex justify-end space-x-3">
+            <div class="p-3 border-t border-gray-200 bg-gray-50 rounded-b-xl flex justify-end space-x-3 shrink-0">
                 <button onclick="closeModals()" class="px-4 py-2 text-gray-600 text-sm font-medium hover:bg-gray-200 rounded-lg transition">Cancel</button>
                 <button onclick="saveSettings()" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 rounded-lg shadow-md transition">Apply</button>
             </div>
@@ -795,6 +869,146 @@
         let mapMarkers = [];
         let cropper = null;
 
+        // --- Custom Color Picker Setup ---
+        const quickColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#0ea5e9', '#3b82f6', '#8b5cf6', '#ec4899', '#64748b', '#000000'];
+
+        function hexToHSL(hex) {
+            let r = parseInt(hex.slice(1, 3), 16) / 255;
+            let g = parseInt(hex.slice(3, 5), 16) / 255;
+            let b = parseInt(hex.slice(5, 7), 16) / 255;
+            let max = Math.max(r, g, b), min = Math.min(r, g, b);
+            let h = 0, s = 0, l = (max + min) / 2;
+            if (max !== min) {
+                let d = max - min;
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
+                }
+                h /= 6;
+            }
+            return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+        }
+
+        function hslToHex(h, s, l) {
+            l /= 100;
+            const a = s * Math.min(l, 1 - l) / 100;
+            const f = n => {
+                const k = (n + h / 30) % 12;
+                const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+                return Math.round(255 * color).toString(16).padStart(2, '0');
+            };
+            return `#${f(0)}${f(8)}${f(4)}`;
+        }
+
+        function initColorPicker(prefix) {
+            const container = document.getElementById(`quick-colors-${prefix}`);
+            container.innerHTML = quickColors.map(c => `
+                <div onclick="setColorPickerValue('${prefix}', '${c}')" 
+                     class="w-[22px] h-[22px] rounded-full cursor-pointer border-[2px] transition-transform hover:scale-125 shadow-sm shrink-0"
+                     style="background-color: ${c}; border-color: transparent;" 
+                     data-color="${c}"></div>
+            `).join('');
+
+            ['h', 's', 'l'].forEach(type => {
+                document.getElementById(`slider-${type}-${prefix}`).addEventListener('input', () => updateFromSliders(prefix));
+            });
+
+            document.getElementById(`hex-input-${prefix}`).addEventListener('change', (e) => {
+                let val = e.target.value.trim();
+                if(!val.startsWith('#')) val = '#' + val;
+                if (/^#[0-9A-F]{3}$/i.test(val)) {
+                    val = '#' + val[1]+val[1] + val[2]+val[2] + val[3]+val[3];
+                }
+                if(/^#[0-9A-F]{6}$/i.test(val)) {
+                    setColorPickerValue(prefix, val, true);
+                } else {
+                    e.target.value = document.getElementById(prefix === 'marker' ? 'setting-color' : 'setting-nav-color').value;
+                }
+            });
+        }
+
+        function setColorPickerValue(prefix, hex, updateSliders = true) {
+            document.getElementById(prefix === 'marker' ? 'setting-color' : 'setting-nav-color').value = hex;
+            document.getElementById(`preview-${prefix}`).style.backgroundColor = hex;
+            document.getElementById(`hex-input-${prefix}`).value = hex;
+            
+            const swatches = document.querySelectorAll(`#quick-colors-${prefix} div`);
+            swatches.forEach(sw => {
+                if (sw.getAttribute('data-color').toLowerCase() === hex.toLowerCase()) {
+                    sw.style.borderColor = '#1f2937';
+                    sw.classList.add('scale-110');
+                } else {
+                    sw.style.borderColor = 'transparent';
+                    sw.classList.remove('scale-110');
+                }
+            });
+
+            if (updateSliders) {
+                const hsl = hexToHSL(hex);
+                document.getElementById(`slider-h-${prefix}`).value = hsl.h;
+                document.getElementById(`slider-s-${prefix}`).value = hsl.s;
+                document.getElementById(`slider-l-${prefix}`).value = hsl.l;
+                updateSliderBackgrounds(prefix, hsl.h, hsl.s, hsl.l);
+            }
+        }
+
+        function updateFromSliders(prefix) {
+            const h = parseInt(document.getElementById(`slider-h-${prefix}`).value);
+            const s = parseInt(document.getElementById(`slider-s-${prefix}`).value);
+            const l = parseInt(document.getElementById(`slider-l-${prefix}`).value);
+            
+            const hex = hslToHex(h, s, l);
+            
+            document.getElementById(prefix === 'marker' ? 'setting-color' : 'setting-nav-color').value = hex;
+            document.getElementById(`preview-${prefix}`).style.backgroundColor = hex;
+            document.getElementById(`hex-input-${prefix}`).value = hex;
+            
+            updateSliderBackgrounds(prefix, h, s, l);
+            
+            const swatches = document.querySelectorAll(`#quick-colors-${prefix} div`);
+            swatches.forEach(sw => {
+                if (sw.getAttribute('data-color').toLowerCase() === hex.toLowerCase()) {
+                    sw.style.borderColor = '#1f2937';
+                    sw.classList.add('scale-110');
+                } else {
+                    sw.style.borderColor = 'transparent';
+                    sw.classList.remove('scale-110');
+                }
+            });
+        }
+
+        function updateSliderBackgrounds(prefix, h, s, l) {
+            document.getElementById(`val-h-${prefix}`).innerText = h + '°';
+            document.getElementById(`val-s-${prefix}`).innerText = s + '%';
+            document.getElementById(`val-l-${prefix}`).innerText = l + '%';
+
+            const sSlider = document.getElementById(`slider-s-${prefix}`);
+            sSlider.style.background = `linear-gradient(to right, hsl(${h}, 0%, ${l}%), hsl(${h}, 100%, ${l}%))`;
+            
+            const lSlider = document.getElementById(`slider-l-${prefix}`);
+            lSlider.style.background = `linear-gradient(to right, #000, hsl(${h}, ${s}%, 50%), #fff)`;
+        }
+
+        function toggleCustomColor(prefix) {
+            const panel = document.getElementById(`custom-panel-${prefix}`);
+            const text = document.getElementById(`toggle-text-${prefix}`);
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                panel.classList.add('flex');
+                text.innerText = 'Hide Custom Color';
+                
+                const hex = document.getElementById(prefix === 'marker' ? 'setting-color' : 'setting-nav-color').value;
+                const hsl = hexToHSL(hex);
+                updateSliderBackgrounds(prefix, hsl.h, hsl.s, hsl.l);
+            } else {
+                panel.classList.add('hidden');
+                panel.classList.remove('flex');
+                text.innerText = 'Custom Color';
+            }
+        }
+
         // Force purges ALL warp markers safely
         function removeAllWarpMarkers() {
             if (imgMarkers && warpImageMap) {
@@ -893,6 +1107,8 @@
             await loadOverlaysMeta();
             setupDrawerSwiping();
             initSortableLists();
+            initColorPicker('marker');
+            initColorPicker('nav');
             
             lucide.createIcons();
             renderBaseMapsList();
@@ -2779,9 +2995,11 @@
         function openSettingsModal() {
             closeDrawerIfOpen();
             document.getElementById('setting-force-25k').checked = globalForce25kAtZoom7;
-            document.getElementById('setting-color').value = globalMarkerColor;
             document.getElementById('setting-shape').value = globalMarkerShape;
-            document.getElementById('setting-nav-color').value = globalNavColor;
+            
+            setColorPickerValue('marker', globalMarkerColor, true);
+            setColorPickerValue('nav', globalNavColor, true);
+            
             showModal('settings-modal');
         }
 
