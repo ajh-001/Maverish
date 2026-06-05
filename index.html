@@ -902,14 +902,38 @@
             return `#${f(0)}${f(8)}${f(4)}`;
         }
 
+        function handleCustomSwatchClick(prefix) {
+            const customSwatch = document.getElementById(`custom-swatch-${prefix}`);
+            const color = customSwatch.getAttribute('data-color');
+            if (color !== 'custom' && color !== '') {
+                setColorPickerValue(prefix, color, true);
+            } else {
+                const panel = document.getElementById(`custom-panel-${prefix}`);
+                if (panel.classList.contains('hidden')) {
+                    toggleCustomColor(prefix);
+                }
+            }
+        }
+
         function initColorPicker(prefix) {
             const container = document.getElementById(`quick-colors-${prefix}`);
-            container.innerHTML = quickColors.map(c => `
+            let html = quickColors.map(c => `
                 <div onclick="setColorPickerValue('${prefix}', '${c}')" 
-                     class="w-[22px] h-[22px] rounded-full cursor-pointer border-[2px] transition-transform hover:scale-125 shadow-sm shrink-0"
+                     class="w-[22px] h-[22px] rounded-full cursor-pointer border-[2px] transition-transform hover:scale-125 shadow-sm shrink-0 swatch-preset"
                      style="background-color: ${c}; border-color: transparent;" 
                      data-color="${c}"></div>
             `).join('');
+            
+            html += `<div class="w-px h-5 bg-gray-300 mx-1 self-center"></div>`;
+            html += `
+                <div id="custom-swatch-${prefix}" onclick="handleCustomSwatchClick('${prefix}')" 
+                     class="w-[22px] h-[22px] rounded-full cursor-pointer border-[2px] transition-transform hover:scale-125 shadow-sm shrink-0 swatch-custom flex items-center justify-center"
+                     style="background-color: transparent; border-color: #d1d5db;" 
+                     data-color="custom" title="Custom Color Spot">
+                     <svg id="custom-icon-${prefix}" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </div>
+            `;
+            container.innerHTML = html;
 
             ['h', 's', 'l'].forEach(type => {
                 document.getElementById(`slider-${type}-${prefix}`).addEventListener('input', () => updateFromSliders(prefix));
@@ -934,16 +958,36 @@
             document.getElementById(`preview-${prefix}`).style.backgroundColor = hex;
             document.getElementById(`hex-input-${prefix}`).value = hex;
             
-            const swatches = document.querySelectorAll(`#quick-colors-${prefix} div`);
+            let isQuickColor = false;
+            
+            const swatches = document.querySelectorAll(`#quick-colors-${prefix} .swatch-preset`);
             swatches.forEach(sw => {
                 if (sw.getAttribute('data-color').toLowerCase() === hex.toLowerCase()) {
                     sw.style.borderColor = '#1f2937';
                     sw.classList.add('scale-110');
+                    isQuickColor = true;
                 } else {
                     sw.style.borderColor = 'transparent';
                     sw.classList.remove('scale-110');
                 }
             });
+
+            const customSwatch = document.getElementById(`custom-swatch-${prefix}`);
+            const customIcon = document.getElementById(`custom-icon-${prefix}`);
+            
+            if (!isQuickColor) {
+                customSwatch.style.backgroundColor = hex;
+                customSwatch.style.borderColor = '#1f2937';
+                customSwatch.classList.add('scale-110');
+                customSwatch.setAttribute('data-color', hex);
+                if(customIcon) customIcon.style.display = 'none';
+            } else {
+                customSwatch.style.borderColor = '#d1d5db';
+                customSwatch.classList.remove('scale-110');
+                if (customSwatch.style.backgroundColor === 'transparent' || customSwatch.style.backgroundColor === '') {
+                    if(customIcon) customIcon.style.display = 'block';
+                }
+            }
 
             if (updateSliders) {
                 const hsl = hexToHSL(hex);
@@ -961,22 +1005,8 @@
             
             const hex = hslToHex(h, s, l);
             
-            document.getElementById(prefix === 'marker' ? 'setting-color' : 'setting-nav-color').value = hex;
-            document.getElementById(`preview-${prefix}`).style.backgroundColor = hex;
-            document.getElementById(`hex-input-${prefix}`).value = hex;
-            
+            setColorPickerValue(prefix, hex, false);
             updateSliderBackgrounds(prefix, h, s, l);
-            
-            const swatches = document.querySelectorAll(`#quick-colors-${prefix} div`);
-            swatches.forEach(sw => {
-                if (sw.getAttribute('data-color').toLowerCase() === hex.toLowerCase()) {
-                    sw.style.borderColor = '#1f2937';
-                    sw.classList.add('scale-110');
-                } else {
-                    sw.style.borderColor = 'transparent';
-                    sw.classList.remove('scale-110');
-                }
-            });
         }
 
         function updateSliderBackgrounds(prefix, h, s, l) {
@@ -2999,6 +3029,15 @@
             
             setColorPickerValue('marker', globalMarkerColor, true);
             setColorPickerValue('nav', globalNavColor, true);
+
+            // Ensure custom panels are folded back down when opened
+            ['marker', 'nav'].forEach(prefix => {
+                const panel = document.getElementById(`custom-panel-${prefix}`);
+                const text = document.getElementById(`toggle-text-${prefix}`);
+                panel.classList.add('hidden');
+                panel.classList.remove('flex');
+                text.innerText = 'Custom Color';
+            });
             
             showModal('settings-modal');
         }
