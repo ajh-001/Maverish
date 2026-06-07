@@ -47,6 +47,31 @@
         #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 10; }
         #ui-layer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 20; }
         
+        /* Dynamic OS Map Scaling variables */
+        :root {
+            --os-map-scale: 0.8;
+            --os-map-inv-scale: 1.25;
+            --os-map-width: 125%;
+            --os-map-squeeze-bottom: 475px;
+        }
+
+        /* Dynamic scale reduction for OS Leisure & Road Map */
+        #map.os-map-scaled {
+            width: var(--os-map-width) !important;
+            height: var(--os-map-width) !important;
+            transform: scale(var(--os-map-scale));
+            transform-origin: top left;
+        }
+        /* Scale back up control elements to keep them standard size */
+        #map.os-map-scaled .leaflet-control {
+            transform: scale(var(--os-map-inv-scale)) !important;
+            transform-origin: center;
+        }
+        /* Compensate bottom squeeze height when map is scaled */
+        #map.os-map-scaled.map-squeezed {
+            bottom: var(--os-map-squeeze-bottom) !important;
+        }
+
         /* Map Squeeze Class */
         .map-squeezed { bottom: 380px !important; }
         
@@ -315,7 +340,7 @@
                         <!-- Advanced split-screen workspace container -->
                         <div class="border border-gray-200 rounded-xl overflow-hidden bg-gray-50 flex flex-col h-[280px] shrink-0">
                             <!-- Instruction Header -->
-                            <div class="bg-gray-100 px-3 py-1.5 border-b border-gray-200 flex justify-between items-center text-[11px] font-bold text-gray-700 shrink-0">
+                            <div class="bg-gray-100 px-3 py-1.5 border-b border-slate-200 flex justify-between items-center text-[11px] font-bold text-gray-700 shrink-0">
                                 <span id="warp-instruction">Step 1: Tap point on bottom Image</span>
                                 <div class="flex gap-1">
                                     <button type="button" id="btn-delete-point" onclick="toggleDeletePointMode()" class="px-2 py-0.5 bg-white text-gray-700 border border-gray-300 rounded hover:bg-gray-100 transition">Delete Pt</button>
@@ -540,6 +565,27 @@
                     </div>
                 </div>
 
+                <!-- OS Map Scaling -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-2">OS Map Scaling</label>
+                    <div class="bg-gray-50 border border-gray-300 rounded-lg p-3 space-y-3">
+                        <label class="flex items-center gap-3 cursor-pointer hover:bg-gray-100 transition p-1 -m-1 rounded">
+                            <input type="checkbox" id="setting-scale-enabled" class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer" onchange="toggleScaleSlider()">
+                            <div class="flex flex-col">
+                                <span class="text-sm font-bold text-gray-800">Enable OS Map Scaling</span>
+                                <span class="text-[10px] text-gray-500 leading-tight">Adjust OS Maps (Leisure & Road) to match other map types</span>
+                            </div>
+                        </label>
+                        <div id="scale-slider-container" class="transition-opacity pt-2 border-t border-gray-200">
+                            <div class="flex justify-between text-[10px] text-gray-500 font-bold mb-1">
+                                <span>Scale Factor</span>
+                                <span id="val-os-scale">80%</span>
+                            </div>
+                            <input type="range" id="setting-scale-factor" min="50" max="100" value="80" class="w-full h-2 bg-gray-200 rounded-lg appearance-none outline-none accent-blue-600 cursor-pointer" oninput="document.getElementById('val-os-scale').innerText = this.value + '%'">
+                        </div>
+                    </div>
+                </div>
+
                 <!-- OS Map Behavior -->
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-2">OS Map Behavior</label>
@@ -547,7 +593,7 @@
                         <input type="checkbox" id="setting-force-25k" class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer">
                         <div class="flex flex-col">
                             <span class="text-sm font-bold text-gray-800">Force 1:25k at Zoom 7</span>
-                            <span class="text-[10px] text-gray-500 leading-tight">Scale down the Explorer map instead of showing the Landranger map</span>
+                            <span class="text-[10px] text-gray-500 leading-tight">OS Maps (Leisure and Roads): Scale down the Explorer map instead of showing the Landranger map</span>
                         </div>
                     </label>
                 </div>
@@ -836,6 +882,8 @@
         let globalMarkerShape = 'dot';
         let globalNavColor = '#2563eb'; // Default tailwind blue
         let globalForce25kAtZoom7 = false; // OS Maps override setting
+        let globalOSMapScalingEnabled = true;
+        let globalOSMapScaleFactor = 80;
         
         let initialCenter = [51.505, -0.09];
         let initialZoom = 10;
@@ -1042,6 +1090,37 @@
             }
         }
 
+        function toggleScaleSlider() {
+            const enabled = document.getElementById('setting-scale-enabled').checked;
+            const container = document.getElementById('scale-slider-container');
+            container.style.opacity = enabled ? '1' : '0.5';
+            document.getElementById('setting-scale-factor').disabled = !enabled;
+        }
+
+        function applyMapScale() {
+            const mapEl = document.getElementById('map');
+            if (!mapEl) return;
+            
+            if (currentMapType === 'os_combined' && globalOSMapScalingEnabled) {
+                const scale = globalOSMapScaleFactor / 100;
+                const invScale = 1 / scale;
+                const widthPct = (invScale * 100) + '%';
+                const squeezeBottom = 380 * invScale + 'px';
+                
+                document.documentElement.style.setProperty('--os-map-scale', scale);
+                document.documentElement.style.setProperty('--os-map-inv-scale', invScale);
+                document.documentElement.style.setProperty('--os-map-width', widthPct);
+                document.documentElement.style.setProperty('--os-map-squeeze-bottom', squeezeBottom);
+                
+                mapEl.classList.add('os-map-scaled');
+            } else {
+                mapEl.classList.remove('os-map-scaled');
+            }
+            if (map) {
+                setTimeout(() => map.invalidateSize(), 50);
+            }
+        }
+
         // Force purges ALL warp markers safely
         function removeAllWarpMarkers() {
             if (imgMarkers && warpImageMap) {
@@ -1104,7 +1183,7 @@
             "topo": L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '© OpenTopoMap' }),
             "aerial": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Tiles © Esri' }),
             "bing_os": new L.TileLayer.BingOS('', { maxZoom: 18, maxNativeZoom: 15, attribution: 'Map data © Microsoft / Ordnance Survey' }),
-            "nls_1900s": L.tileLayer('https://api.maptiler.com/tiles/uk-osgb1888/{z}/{x}/{y}.png?key=2kL7DeUecj7AV2KQXaI2', { maxZoom: 18, attribution: '© <a href="https://www.maptiler.com/">MapTiler</a> © <a href="https://maps.nls.uk/">National Library of Scotland</a>' })
+            "nls_1900s": L.tileLayer('https://api.maptiler.com/tiles/uk-osgb1888/{z}/{x}/{y}?key=2kL7DeUecj7AV2KQXaI2', { maxZoom: 18, attribution: '© <a href="https://www.maptiler.com/">MapTiler</a> © <a href="https://maps.nls.uk/">National Library of Scotland</a>' })
         };
 
         // --- OS Map Layer Generation ---
@@ -1216,6 +1295,8 @@
             }
             currentBaseLayer.addTo(map);
 
+            applyMapScale();
+
             initUserMarker();
             initCompassTicks();
             setupMapListeners();
@@ -1260,6 +1341,8 @@
                 currentBaseLayer = mapLayers[currentMapType];
             }
             currentBaseLayer.addTo(map);
+            
+            applyMapScale();
             
             setupMapListeners(); 
             initUserMarker();
@@ -1551,6 +1634,7 @@
                         if (navPolyline && typeof navPolyline.bringToFront === 'function') navPolyline.bringToFront();
                     } catch (e) { console.warn('Could not bring layers to front', e); }
                 }
+                applyMapScale();
                 saveMapState();
             } finally {
                 // Ensure highlighting applies regardless of layer errors
@@ -1893,7 +1977,7 @@
                         isBottomPanelOpen = false;
                         updateOpacitySliderVisibility();
 
-                        document.getElementById('instruction-overlay-text').innerText = "Click map to place image centre";
+                        document.getElementById('instruction-overlay-text').innerText = "Click map to place image center.";
                         document.getElementById('map-instruction-overlay').classList.remove('hidden');
                         document.getElementById('map').classList.add('map-placing-overlay');
                         lucide.createIcons();
@@ -3032,6 +3116,11 @@
             document.getElementById('setting-force-25k').checked = globalForce25kAtZoom7;
             document.getElementById('setting-shape').value = globalMarkerShape;
             
+            document.getElementById('setting-scale-enabled').checked = globalOSMapScalingEnabled;
+            document.getElementById('setting-scale-factor').value = globalOSMapScaleFactor;
+            document.getElementById('val-os-scale').innerText = globalOSMapScaleFactor + '%';
+            toggleScaleSlider();
+            
             setColorPickerValue('marker', globalMarkerColor, true);
             setColorPickerValue('nav', globalNavColor, true);
 
@@ -3056,6 +3145,9 @@
             globalNavColor = document.getElementById('setting-nav-color').value;
             globalForce25kAtZoom7 = newForce25k;
             
+            globalOSMapScalingEnabled = document.getElementById('setting-scale-enabled').checked;
+            globalOSMapScaleFactor = parseInt(document.getElementById('setting-scale-factor').value);
+            
             if (navPolyline) {
                 navPolyline.setStyle({ color: globalNavColor });
             }
@@ -3074,6 +3166,7 @@
                 if (navPolyline && typeof navPolyline.bringToFront === 'function') navPolyline.bringToFront();
             }
             
+            applyMapScale();
             saveMapState();
             markers.forEach(m => { if (m.leafletMarker) m.leafletMarker.setIcon(getCustomIcon()); });
             closeModals();
@@ -3090,6 +3183,8 @@
                     if (parsed.navColor) globalNavColor = parsed.navColor;
                     if (parsed.mapType) currentMapType = parsed.mapType;
                     if (parsed.force25k !== undefined) globalForce25kAtZoom7 = parsed.force25k;
+                    if (parsed.scaleEnabled !== undefined) globalOSMapScalingEnabled = parsed.scaleEnabled;
+                    if (parsed.scaleFactor !== undefined) globalOSMapScaleFactor = parsed.scaleFactor;
                     if (parsed.center) initialCenter = [parsed.center.lat, parsed.center.lng];
                     if (parsed.zoom) initialZoom = parsed.zoom;
                 } catch(e) {}
@@ -3101,7 +3196,8 @@
             const settings = { 
                 color: globalMarkerColor, shape: globalMarkerShape, navColor: globalNavColor, mapType: currentMapType,
                 center: map.getCenter(), zoom: map.getZoom(),
-                force25k: globalForce25kAtZoom7
+                force25k: globalForce25kAtZoom7,
+                scaleEnabled: globalOSMapScalingEnabled, scaleFactor: globalOSMapScaleFactor
             };
             localStorage.setItem('maverish_settings', JSON.stringify(settings));
         }
