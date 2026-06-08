@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="">
+<html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -17,11 +17,6 @@
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-        }
-    </script>
     
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -47,7 +42,6 @@
 
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background-color: #f3f4f6; }
-        .dark body { background-color: #111827; }
         
         #map, #ui-layer { transition: bottom 0.3s ease-out; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 10; }
@@ -106,6 +100,10 @@
         .panel-open { transform: translateY(0%); }
         .panel-closed { transform: translateY(100%); }
         
+        /* Modal transitions */
+        .modal-fade-in { opacity: 1; pointer-events: auto; }
+        .modal-fade-out { opacity: 0; pointer-events: none; }
+        
         /* Hide scrollbar */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -116,7 +114,6 @@
         /* Tab styling */
         .tab-active { border-bottom: 2px solid #2563eb; color: #2563eb; font-weight: bold; }
         .tab-inactive { border-bottom: 2px solid transparent; color: #6b7280; font-weight: 500; }
-        .dark .tab-inactive { color: #9ca3af; }
 
         /* Warp markers custom style */
         .map-marker-icon {
@@ -175,26 +172,9 @@
             cursor: pointer;
             box-shadow: 0 1px 3px rgba(0,0,0,0.3);
         }
-
-        /* Dark Mode Leaflet Overrides */
-        .dark .leaflet-popup-content-wrapper, .dark .leaflet-popup-tip {
-            background-color: #1f2937;
-            color: #f3f4f6;
-        }
-        .dark .leaflet-bar a {
-            background-color: #374151;
-            color: #f3f4f6;
-            border-bottom-color: #4b5563;
-        }
-        .dark .leaflet-bar a:hover {
-            background-color: #4b5563;
-        }
-        .dark .leaflet-control-zoom-in, .dark .leaflet-control-zoom-out {
-            color: #e5e7eb !important;
-        }
     </style>
 </head>
-<body class="text-gray-800 dark:text-gray-100 font-sans antialiased transition-colors duration-300">
+<body class="text-gray-800 font-sans antialiased">
 
     <!-- Map Container -->
     <div id="map"></div>
@@ -238,57 +218,57 @@
         </div>
 
         <!-- ALWAYS-AVAILABLE OPACITY SLIDER (Bottom Center) -->
-        <div id="floating-opacity-card" class="hidden absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-2xl p-4 shadow-xl border border-gray-200 dark:border-gray-700 flex flex-col gap-1.5 z-[21] w-[240px] pointer-events-auto transition-all duration-300">
-            <div class="flex justify-between items-center text-xs font-bold text-gray-700 dark:text-gray-200 px-1">
+        <div id="floating-opacity-card" class="hidden absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-xl border border-gray-200 flex flex-col gap-1.5 z-[21] w-[240px] pointer-events-auto transition-all duration-300">
+            <div class="flex justify-between items-center text-xs font-bold text-gray-700 px-1">
                 <span class="flex items-center gap-1.5">
                     <i data-lucide="sliders" class="w-3.5 h-3.5 text-blue-500"></i>
                     Opacity
                 </span>
-                <span id="floating-opacity-val" class="text-blue-600 dark:text-blue-400">60%</span>
+                <span id="floating-opacity-val" class="text-blue-600">60%</span>
             </div>
-            <input type="range" id="floating-opacity-slider" min="0" max="100" value="60" class="w-full accent-blue-600 cursor-pointer h-1.5 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none">
+            <input type="range" id="floating-opacity-slider" min="0" max="100" value="60" class="w-full accent-blue-600 cursor-pointer h-1.5 bg-gray-200 rounded-lg appearance-none">
         </div>
 
         <!-- Floating Action Buttons -->
         <div class="absolute bottom-6 left-6 pointer-events-auto z-10">
-            <button onclick="toggleDrawer()" class="bg-white dark:bg-gray-800 w-12 h-12 flex items-center justify-center rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
-                <i data-lucide="menu" class="w-5 h-5 text-gray-700 dark:text-gray-200"></i>
+            <button onclick="toggleDrawer()" class="bg-white w-12 h-12 flex items-center justify-center rounded-xl shadow-lg border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <i data-lucide="menu" class="w-5 h-5 text-gray-700"></i>
             </button>
         </div>
 
         <div class="absolute bottom-6 right-6 flex flex-col space-y-4 pointer-events-auto z-10">
-            <button id="center-btn" onclick="centerOnUser()" class="bg-white dark:bg-gray-800 w-12 h-12 flex items-center justify-center rounded-full shadow-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+            <button id="center-btn" onclick="centerOnUser()" class="bg-white w-12 h-12 flex items-center justify-center rounded-full shadow-lg border border-gray-200 hover:bg-gray-50 transition-colors">
                 <i data-lucide="crosshair" class="w-5 h-5 text-blue-600 transition-colors"></i>
             </button>
-            <button onclick="openAddMenu()" class="bg-blue-600 w-12 h-12 flex items-center justify-center rounded-full shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
+            <button onclick="openAddMenu()" class="bg-blue-600 w-12 h-12 flex items-center justify-center rounded-full shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
                 <i data-lucide="plus" class="w-5 h-5 text-white"></i>
             </button>
         </div>
     </div>
 
     <!-- Unified Bottom Panel (Points & Overlays) -->
-    <div id="bottom-panel" class="fixed bottom-0 left-0 right-0 h-[380px] bg-white dark:bg-gray-800 shadow-[0_-10px_30px_rgba(0,0,0,0.15)] dark:shadow-[0_-10px_30px_rgba(0,0,0,0.5)] z-[35] panel-closed transition-transform duration-300 flex flex-col pointer-events-auto">
-        <div class="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900 shrink-0">
-            <h3 id="panel-title" class="text-base font-bold text-gray-800 dark:text-gray-100">Add Item</h3>
-            <button onclick="cancelItem()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 transition-colors">
+    <div id="bottom-panel" class="fixed bottom-0 left-0 right-0 h-[380px] bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.15)] z-[35] panel-closed transition-transform duration-300 flex flex-col pointer-events-auto">
+        <div class="p-3 border-b border-gray-200 flex justify-between items-center bg-gray-50 shrink-0">
+            <h3 id="panel-title" class="text-base font-bold text-gray-800">Add Item</h3>
+            <button onclick="cancelItem()" class="text-gray-400 hover:text-gray-600 p-1">
                 <i data-lucide="x" class="w-5 h-5"></i>
             </button>
         </div>
         
-        <div class="p-4 overflow-y-auto flex-1 bg-white dark:bg-gray-800 relative">
+        <div class="p-4 overflow-y-auto flex-1 bg-white relative">
             <input type="hidden" id="edit-item-id" value="">
             <input type="hidden" id="edit-item-type" value="point"> <!-- 'point' or 'overlay' -->
             
             <div class="mb-4">
-                <label id="name-label" class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Name / Label</label>
-                <input type="text" id="item-name" placeholder="e.g., Summit, Basecamp" class="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                <label id="name-label" class="block text-xs font-semibold text-gray-700 mb-1">Name / Label</label>
+                <input type="text" id="item-name" placeholder="e.g., Summit, Basecamp" class="w-full text-sm border border-gray-300 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500">
             </div>
 
             <!-- POINT SPECIFIC CONTENT -->
             <div id="panel-point-content" class="hidden">
                 <div class="mb-4">
-                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Input Method</label>
-                    <select id="coord-format" onchange="updateCoordInputs()" class="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-gray-50 dark:bg-gray-700 dark:text-white transition-colors">
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Input Method</label>
+                    <select id="coord-format" onchange="updateCoordInputs()" class="w-full text-sm border border-gray-300 rounded-lg p-2 bg-gray-50">
                         <option value="map">Map Crosshair</option>
                         <option value="dd">Decimal Degrees (DD)</option>
                         <option value="ddm">Degrees, Dec Minutes (DDM)</option>
@@ -297,28 +277,28 @@
                     </select>
                 </div>
 
-                <div id="input-map" class="text-center p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-100 dark:border-blue-800">
-                    <p class="text-xs text-blue-800 dark:text-blue-300 mb-2">Pan the map to position the crosshair.</p>
-                    <p id="picked-coords-display" class="text-lg font-mono font-bold text-blue-900 dark:text-blue-100 tracking-wide"></p>
+                <div id="input-map" class="text-center p-3 bg-blue-50 rounded-lg border border-blue-100">
+                    <p class="text-xs text-blue-800 mb-2">Pan the map to position the crosshair.</p>
+                    <p id="picked-coords-display" class="text-lg font-mono font-bold text-blue-900 tracking-wide"></p>
                 </div>
 
                 <div id="input-dd" class="hidden space-y-3">
                     <div class="flex gap-2">
                         <div class="flex-1">
-                            <label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">Latitude</label>
-                            <input type="number" id="dd-lat" step="any" class="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg p-2" oninput="syncCoords('dd')">
+                            <label class="text-xs text-gray-500 block mb-1">Latitude</label>
+                            <input type="number" id="dd-lat" step="any" class="w-full text-sm border border-gray-300 rounded-lg p-2" oninput="syncCoords('dd')">
                         </div>
                         <div class="flex-1">
-                            <label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">Longitude</label>
-                            <input type="number" id="dd-lng" step="any" class="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg p-2" oninput="syncCoords('dd')">
+                            <label class="text-xs text-gray-500 block mb-1">Longitude</label>
+                            <input type="number" id="dd-lng" step="any" class="w-full text-sm border border-gray-300 rounded-lg p-2" oninput="syncCoords('dd')">
                         </div>
                     </div>
                 </div>
 
                 <!-- DDM, DMS, OS blocks -->
-                <div id="input-ddm" class="hidden space-y-3"><div class="grid grid-cols-2 gap-2"><div><label class="text-[10px] text-gray-500 dark:text-gray-400 block mb-1 uppercase">Lat Deg</label><input type="number" id="ddm-lat-d" class="w-full text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded p-2" oninput="syncCoords('ddm')"></div><div><label class="text-[10px] text-gray-500 dark:text-gray-400 block mb-1 uppercase">Lat Min</label><input type="number" id="ddm-lat-m" step="any" class="w-full text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded p-2" oninput="syncCoords('ddm')"></div><div><label class="text-[10px] text-gray-500 dark:text-gray-400 block mb-1 uppercase">Lng Deg</label><input type="number" id="ddm-lng-d" class="w-full text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded p-2" oninput="syncCoords('ddm')"></div><div><label class="text-[10px] text-gray-500 dark:text-gray-400 block mb-1 uppercase">Lng Min</label><input type="number" id="ddm-lng-m" step="any" class="w-full text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded p-2" oninput="syncCoords('ddm')"></div></div></div>
-                <div id="input-dms" class="hidden space-y-3"><div class="grid grid-cols-3 gap-2 mb-2"><div><label class="text-[10px] text-gray-500 dark:text-gray-400 block mb-1 uppercase">Lat Deg</label><input type="number" id="dms-lat-d" class="w-full text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded p-2" oninput="syncCoords('dms')"></div><div><label class="text-[10px] text-gray-500 dark:text-gray-400 block mb-1 uppercase">Lat Min</label><input type="number" id="dms-lat-m" class="w-full text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded p-2" oninput="syncCoords('dms')"></div><div><label class="text-[10px] text-gray-500 dark:text-gray-400 block mb-1 uppercase">Lat Sec</label><input type="number" id="dms-lat-s" step="any" class="w-full text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded p-2" oninput="syncCoords('dms')"></div></div><div class="grid grid-cols-3 gap-2"><div><label class="text-[10px] text-gray-500 dark:text-gray-400 block mb-1 uppercase">Lng Deg</label><input type="number" id="dms-lng-d" class="w-full text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded p-2" oninput="syncCoords('dms')"></div><div><label class="text-[10px] text-gray-500 dark:text-gray-400 block mb-1 uppercase">Lng Min</label><input type="number" id="dms-lng-m" class="w-full text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded p-2" oninput="syncCoords('dms')"></div><div><label class="text-[10px] text-gray-500 dark:text-gray-400 block mb-1 uppercase">Lng Sec</label><input type="number" id="dms-lng-s" step="any" class="w-full text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded p-2" oninput="syncCoords('dms')"></div></div></div>
-                <div id="input-os" class="hidden space-y-3"><div class="flex gap-2"><div class="flex-1"><label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">Easting</label><input type="number" id="os-easting" class="w-full text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded p-2" oninput="syncCoords('os')"></div><div class="flex-1"><label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">Northing</label><input type="number" id="os-northing" class="w-full text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded p-2" oninput="syncCoords('os')"></div></div></div>
+                <div id="input-ddm" class="hidden space-y-3"><div class="grid grid-cols-2 gap-2"><div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lat Deg</label><input type="number" id="ddm-lat-d" class="w-full text-sm border p-2" oninput="syncCoords('ddm')"></div><div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lat Min</label><input type="number" id="ddm-lat-m" step="any" class="w-full text-sm border p-2" oninput="syncCoords('ddm')"></div><div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lng Deg</label><input type="number" id="ddm-lng-d" class="w-full text-sm border p-2" oninput="syncCoords('ddm')"></div><div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lng Min</label><input type="number" id="ddm-lng-m" step="any" class="w-full text-sm border p-2" oninput="syncCoords('ddm')"></div></div></div>
+                <div id="input-dms" class="hidden space-y-3"><div class="grid grid-cols-3 gap-2 mb-2"><div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lat Deg</label><input type="number" id="dms-lat-d" class="w-full text-sm border p-2" oninput="syncCoords('dms')"></div><div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lat Min</label><input type="number" id="dms-lat-m" class="w-full text-sm border p-2" oninput="syncCoords('dms')"></div><div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lat Sec</label><input type="number" id="dms-lat-s" step="any" class="w-full text-sm border p-2" oninput="syncCoords('dms')"></div></div><div class="grid grid-cols-3 gap-2"><div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lng Deg</label><input type="number" id="dms-lng-d" class="w-full text-sm border p-2" oninput="syncCoords('dms')"></div><div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lng Min</label><input type="number" id="dms-lng-m" class="w-full text-sm border p-2" oninput="syncCoords('dms')"></div><div><label class="text-[10px] text-gray-500 block mb-1 uppercase">Lng Sec</label><input type="number" id="dms-lng-s" step="any" class="w-full text-sm border p-2" oninput="syncCoords('dms')"></div></div></div>
+                <div id="input-os" class="hidden space-y-3"><div class="flex gap-2"><div class="flex-1"><label class="text-xs text-gray-500 block mb-1">Easting</label><input type="number" id="os-easting" class="w-full text-sm border p-2" oninput="syncCoords('os')"></div><div class="flex-1"><label class="text-xs text-gray-500 block mb-1">Northing</label><input type="number" id="os-northing" class="w-full text-sm border p-2" oninput="syncCoords('os')"></div></div></div>
             </div>
 
             <!-- OVERLAY SPECIFIC CONTENT -->
@@ -328,28 +308,28 @@
                     <!-- STANDARD CONTROLS (Nudge, Rotate, Scale) -->
                     <div id="overlay-standard-controls" class="flex flex-col gap-4">
                         <!-- Fine Controls Grid -->
-                        <div class="grid grid-cols-2 gap-4 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-xl border border-gray-200 dark:border-gray-700">
+                        <div class="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-xl border border-gray-200">
                             <!-- D-Pad -->
                             <div class="flex flex-col items-center">
                                 <div class="grid grid-cols-3 gap-1 w-[120px]">
                                     <div></div>
-                                    <button id="btn-nudge-up" class="touch-control bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition flex justify-center"><i data-lucide="chevron-up" class="w-5 h-5"></i></button>
+                                    <button id="btn-nudge-up" class="touch-control bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="chevron-up" class="w-5 h-5"></i></button>
                                     <div></div>
-                                    <button id="btn-nudge-left" class="touch-control bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition flex justify-center"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
-                                    <button id="btn-nudge-down" class="touch-control bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition flex justify-center"><i data-lucide="chevron-down" class="w-5 h-5"></i></button>
-                                    <button id="btn-nudge-right" class="touch-control bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition flex justify-center"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+                                    <button id="btn-nudge-left" class="touch-control bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
+                                    <button id="btn-nudge-down" class="touch-control bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="chevron-down" class="w-5 h-5"></i></button>
+                                    <button id="btn-nudge-right" class="touch-control bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
                                 </div>
                             </div>
 
                             <!-- Scale & Rotate -->
                             <div class="flex flex-col justify-center gap-2">
                                 <div class="flex gap-2">
-                                    <button id="btn-scale-down" class="touch-control flex-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition flex justify-center"><i data-lucide="zoom-out" class="w-5 h-5"></i></button>
-                                    <button id="btn-scale-up" class="touch-control flex-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition flex justify-center"><i data-lucide="zoom-in" class="w-5 h-5"></i></button>
+                                    <button id="btn-scale-down" class="touch-control flex-1 bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="zoom-out" class="w-5 h-5"></i></button>
+                                    <button id="btn-scale-up" class="touch-control flex-1 bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="zoom-in" class="w-5 h-5"></i></button>
                                 </div>
                                 <div class="flex gap-2">
-                                    <button id="btn-rotate-left" class="touch-control flex-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition flex justify-center"><i data-lucide="rotate-ccw" class="w-5 h-5"></i></button>
-                                    <button id="btn-rotate-right" class="touch-control flex-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition flex justify-center"><i data-lucide="rotate-cw" class="w-5 h-5"></i></button>
+                                    <button id="btn-rotate-left" class="touch-control flex-1 bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="rotate-ccw" class="w-5 h-5"></i></button>
+                                    <button id="btn-rotate-right" class="touch-control flex-1 bg-white border border-gray-300 p-2 rounded-lg hover:bg-gray-100 text-gray-700 transition flex justify-center"><i data-lucide="rotate-cw" class="w-5 h-5"></i></button>
                                 </div>
                             </div>
                         </div>
@@ -358,42 +338,42 @@
                     <!-- ADVANCED WARP CONTROLS -->
                     <div id="overlay-advanced-controls" class="hidden flex flex-col gap-3">
                         <!-- Advanced split-screen workspace container -->
-                        <div class="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-900 flex flex-col h-[280px] shrink-0">
+                        <div class="border border-gray-200 rounded-xl overflow-hidden bg-gray-50 flex flex-col h-[280px] shrink-0">
                             <!-- Instruction Header -->
-                            <div class="bg-gray-100 dark:bg-gray-800 px-3 py-1.5 border-b border-slate-200 dark:border-gray-700 flex justify-between items-center text-[11px] font-bold text-gray-700 dark:text-gray-300 shrink-0">
+                            <div class="bg-gray-100 px-3 py-1.5 border-b border-slate-200 flex justify-between items-center text-[11px] font-bold text-gray-700 shrink-0">
                                 <span id="warp-instruction">Step 1: Tap point on bottom Image</span>
                                 <div class="flex gap-1">
-                                    <button type="button" id="btn-delete-point" onclick="toggleDeletePointMode()" class="px-2 py-0.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-600 transition">Delete Pt</button>
-                                    <button type="button" onclick="clearWarpPoints()" class="px-2 py-0.5 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded hover:bg-red-100 dark:hover:bg-red-900/50 transition">Clear</button>
+                                    <button type="button" id="btn-delete-point" onclick="toggleDeletePointMode()" class="px-2 py-0.5 bg-white text-gray-700 border border-gray-300 rounded hover:bg-gray-100 transition">Delete Pt</button>
+                                    <button type="button" onclick="clearWarpPoints()" class="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 transition">Clear</button>
                                 </div>
                             </div>
                             <!-- Bottom/Image Simple Map Workspace for Points Mapping -->
-                            <div class="flex-1 relative bg-slate-100 dark:bg-slate-900">
+                            <div class="flex-1 relative bg-slate-100">
                                 <div id="warp-image-map" class="w-full h-full cursor-crosshair"></div>
-                                <div id="warp-image-placeholder" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 text-xs text-center p-4 pointer-events-none">
+                                <div id="warp-image-placeholder" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-slate-400 text-xs text-center p-4 pointer-events-none">
                                     <i data-lucide="image" class="w-8 h-8 opacity-40 mb-1"></i>
                                     <p>Select or upload an image file first to begin control point mapping.</p>
                                 </div>
                             </div>
                         </div>
-                        <div class="flex justify-between items-center text-[10px] text-gray-500 dark:text-gray-400 font-medium px-1">
-                            <span>Points mapped: <b id="warp-point-counter" class="text-blue-600 dark:text-blue-400">0</b> (Min: 3)</span>
+                        <div class="flex justify-between items-center text-[10px] text-gray-500 font-medium px-1">
+                            <span>Points mapped: <b id="warp-point-counter" class="text-blue-600">0</b> (Min: 3)</span>
                             <span>Points link corresponding landmarks.</span>
                         </div>
                     </div>
 
                     <!-- Advanced Warp Toggle / Center / File Row -->
                     <div class="flex gap-2 w-full mt-2 shrink-0">
-                        <label class="flex-1 flex flex-col items-center justify-center bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-[10px] font-bold py-2 rounded-lg transition text-center shadow-sm cursor-pointer">
+                        <label class="flex-1 flex flex-col items-center justify-center bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-[10px] font-bold py-2 rounded-lg transition text-center shadow-sm cursor-pointer">
                             <i data-lucide="image" class="w-4 h-4 mb-1"></i>
                             <span>Image File</span>
                             <input type="file" id="overlay-file-input" class="hidden" accept="image/*">
                         </label>
-                        <button type="button" id="btn-trigger-reselect" onclick="triggerOverlayReselect()" class="flex-1 flex flex-col items-center justify-center bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-[10px] font-bold py-2 rounded-lg transition text-center shadow-sm">
+                        <button type="button" id="btn-trigger-reselect" onclick="triggerOverlayReselect()" class="flex-1 flex flex-col items-center justify-center bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 text-[10px] font-bold py-2 rounded-lg transition text-center shadow-sm">
                             <i data-lucide="crosshair" class="w-4 h-4 mb-1"></i>
                             <span>Re-centre Image</span>
                         </button>
-                        <button type="button" id="btn-toggle-advanced-mode" onclick="toggleAdvancedWarpMode()" class="flex-1 flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 text-[10px] font-bold py-2 rounded-lg transition text-center shadow-sm">
+                        <button type="button" id="btn-toggle-advanced-mode" onclick="toggleAdvancedWarpMode()" class="flex-1 flex flex-col items-center justify-center bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200 text-[10px] font-bold py-2 rounded-lg transition text-center shadow-sm">
                             <i data-lucide="scan" class="w-4 h-4 mb-1"></i>
                             <span id="text-toggle-advanced-mode">Warp OFF</span>
                         </button>
@@ -403,36 +383,36 @@
             </div>
         </div>
 
-        <div class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-between items-center space-x-3 shrink-0">
-            <button id="panel-delete-btn" class="px-4 py-2 text-red-600 dark:text-red-400 text-sm font-medium hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg transition hidden">Delete</button>
+        <div class="p-3 border-t border-gray-200 bg-gray-50 flex justify-between items-center space-x-3 shrink-0">
+            <button id="panel-delete-btn" class="px-4 py-2 text-red-600 text-sm font-medium hover:bg-red-100 rounded-lg transition hidden">Delete</button>
             <div class="flex space-x-3 ml-auto">
-                <button onclick="cancelItem()" class="px-4 py-2 text-gray-600 dark:text-gray-300 text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition">Cancel</button>
+                <button onclick="cancelItem()" class="px-4 py-2 text-gray-600 text-sm font-medium hover:bg-gray-200 rounded-lg transition">Cancel</button>
                 <button id="panel-save-btn" onclick="saveItem()" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 rounded-lg shadow-md transition">Save</button>
             </div>
         </div>
     </div>
 
     <!-- Side Drawer -->
-    <div id="drawer" class="absolute top-0 left-0 h-full w-80 max-w-[85vw] bg-white dark:bg-gray-800 shadow-2xl z-[30] drawer-closed transition-transform duration-300 flex flex-col pointer-events-auto">
-        <div class="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-between items-center shrink-0">
-            <h1 class="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+    <div id="drawer" class="absolute top-0 left-0 h-full w-80 max-w-[85vw] bg-white shadow-2xl z-[30] drawer-closed transition-transform duration-300 flex flex-col pointer-events-auto">
+        <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center shrink-0">
+            <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <img src="Maverish_trans.png" alt="Logo" class="w-12 h-12 object-contain">
                 Maverish
             </h1>
-            <button onclick="toggleDrawer()" class="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 rounded-md transition-colors">
+            <button onclick="toggleDrawer()" class="p-2 text-gray-500 hover:text-gray-800 rounded-md">
                 <i data-lucide="x" class="w-5 h-5"></i>
             </button>
         </div>
 
         <!-- Drawer Tabs -->
-        <div class="flex border-b border-gray-200 dark:border-gray-700 shrink-0">
+        <div class="flex border-b border-gray-200 shrink-0">
             <button onclick="switchDrawerTab('maps')" id="tab-maps" class="flex-1 py-3 text-xs uppercase tracking-wide tab-active transition-colors">Base Maps</button>
             <button onclick="switchDrawerTab('points')" id="tab-points" class="flex-1 py-3 text-xs uppercase tracking-wide tab-inactive transition-colors">Points</button>
             <button onclick="switchDrawerTab('overlays')" id="tab-overlays" class="flex-1 py-3 text-xs uppercase tracking-wide tab-inactive transition-colors">Overlays</button>
         </div>
 
         <!-- Drawer Content Areas -->
-        <div class="flex-1 overflow-y-auto no-scrollbar relative bg-white dark:bg-gray-800">
+        <div class="flex-1 overflow-y-auto no-scrollbar relative bg-white">
             
             <!-- Maps Tab -->
             <div id="drawer-maps" class="p-4">
@@ -447,10 +427,10 @@
                     <!-- Markers rendered dynamically -->
                 </div>
                 <div class="mt-4 flex gap-2 shrink-0">
-                    <button onclick="openPanelForNew('point')" class="flex-1 bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-xs font-semibold py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors">
+                    <button onclick="openPanelForNew('point')" class="flex-1 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-semibold py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors">
                         <i data-lucide="plus" class="w-4 h-4"></i> Add Point
                     </button>
-                    <button id="btn-toggle-all-points" onclick="toggleAllPointsVisibility()" class="flex-1 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs font-semibold py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors">
+                    <button id="btn-toggle-all-points" onclick="toggleAllPointsVisibility()" class="flex-1 bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-700 text-xs font-semibold py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors">
                         <i data-lucide="eye" class="w-4 h-4"></i> <span id="text-toggle-all-points">Hide All</span>
                     </button>
                 </div>
@@ -462,10 +442,10 @@
                     <!-- Overlays rendered dynamically -->
                 </div>
                 <div class="flex gap-2 mt-4 shrink-0">
-                    <button onclick="openPanelForNew('overlay')" class="flex-1 bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-xs font-semibold py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors">
+                    <button onclick="openPanelForNew('overlay')" class="flex-1 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-semibold py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors">
                         <i data-lucide="plus" class="w-4 h-4"></i> Add Overlay
                     </button>
-                    <button onclick="unloadOverlay()" class="flex-1 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs font-semibold py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors">
+                    <button onclick="unloadOverlay()" class="flex-1 bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-700 text-xs font-semibold py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors">
                         Unload Map
                     </button>
                 </div>
@@ -474,66 +454,52 @@
         </div>
         
         <!-- Drawer Footer -->
-        <div class="p-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex gap-2 shrink-0">
-            <button onclick="openSettingsModal()" class="w-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 p-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 font-medium text-sm border border-transparent dark:border-gray-600">
+        <div class="p-3 border-t border-gray-200 bg-white flex gap-2 shrink-0">
+            <button onclick="openSettingsModal()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 p-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 font-medium text-sm">
                 <i data-lucide="settings" class="w-4 h-4"></i> App Settings
             </button>
         </div>
     </div>
 
     <!-- Modals Overlay Container -->
-    <div id="modal-overlay" class="fixed inset-0 bg-black/60 z-[40] hidden opacity-0 transition-opacity duration-300 flex items-center justify-center px-4 pointer-events-none">
+    <div id="modal-overlay" class="absolute inset-0 bg-black bg-opacity-50 z-[40] modal-fade-out transition-opacity duration-300 flex items-center justify-center pointer-events-none px-4">
         
         <!-- Add Action Menu -->
-        <div id="add-menu-modal" class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-xs hidden pointer-events-auto flex-col overflow-hidden transform translate-y-4">
-            <div class="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-center">
-                <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100">What would you like to add?</h3>
+        <div id="add-menu-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-xs hidden pointer-events-auto flex-col overflow-hidden transform translate-y-4">
+            <div class="p-4 border-b border-gray-100 bg-gray-50 text-center">
+                <h3 class="text-sm font-bold text-gray-800">What would you like to add?</h3>
             </div>
-            <button onclick="openPanelForNew('point'); closeModals();" class="flex items-center gap-3 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 transition text-left w-full">
-                <div class="bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 p-2 rounded-full"><i data-lucide="map-pin" class="w-5 h-5"></i></div>
+            <button onclick="openPanelForNew('point'); closeModals();" class="flex items-center gap-3 p-4 hover:bg-gray-50 border-b border-gray-100 transition text-left w-full">
+                <div class="bg-blue-100 text-blue-600 p-2 rounded-full"><i data-lucide="map-pin" class="w-5 h-5"></i></div>
                 <div>
-                    <div class="font-bold text-gray-800 dark:text-gray-100 text-sm">Location Marker</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">Save a specific coordinate</div>
+                    <div class="font-bold text-gray-800 text-sm">Location Marker</div>
+                    <div class="text-xs text-gray-500">Save a specific coordinate</div>
                 </div>
             </button>
-            <button onclick="openPanelForNew('overlay'); closeModals();" class="flex items-center gap-3 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition text-left w-full">
-                <div class="bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400 p-2 rounded-full"><i data-lucide="image" class="w-5 h-5"></i></div>
+            <button onclick="openPanelForNew('overlay'); closeModals();" class="flex items-center gap-3 p-4 hover:bg-gray-50 transition text-left w-full">
+                <div class="bg-green-100 text-green-600 p-2 rounded-full"><i data-lucide="image" class="w-5 h-5"></i></div>
                 <div>
-                    <div class="font-bold text-gray-800 dark:text-gray-100 text-sm">Map Overlay</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">Align or warp a photo over the map</div>
+                    <div class="font-bold text-gray-800 text-sm">Map Overlay</div>
+                    <div class="text-xs text-gray-500">Align or warp a photo over the map</div>
                 </div>
             </button>
-            <div class="p-2 bg-gray-50 dark:bg-gray-900">
-                <button onclick="closeModals()" class="w-full py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">Cancel</button>
+            <div class="p-2 bg-gray-50">
+                <button onclick="closeModals()" class="w-full py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300">Cancel</button>
             </div>
         </div>
 
         <!-- Settings Modal -->
-        <div id="settings-modal" class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col max-h-[90vh]">
-            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center shrink-0 bg-white dark:bg-gray-800 rounded-t-xl">
-                <h3 class="text-base font-bold text-gray-800 dark:text-gray-100">Settings</h3>
-                <button onclick="closeModals()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+        <div id="settings-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col max-h-[90vh]">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center shrink-0">
+                <h3 class="text-base font-bold text-gray-800">Settings</h3>
+                <button onclick="closeModals()" class="text-gray-400 hover:text-gray-600">
                     <i data-lucide="x" class="w-5 h-5"></i>
                 </button>
             </div>
             <div class="p-4 space-y-4 overflow-y-auto">
-                
-                <!-- Dark Mode Toggle -->
                 <div>
-                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Theme</label>
-                    <label class="flex items-center gap-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg p-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition">
-                        <input type="checkbox" id="setting-dark-mode" class="w-4 h-4 text-blue-600 rounded border-gray-300 dark:border-gray-500 focus:ring-blue-500 dark:focus:ring-blue-400 cursor-pointer">
-                        <div class="flex flex-col">
-                            <span class="text-sm font-bold text-gray-800 dark:text-gray-100">Dark Mode</span>
-                            <span class="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">Enable dark theme for the interface</span>
-                        </div>
-                    </label>
-                </div>
-
-                <!-- Marker Appearance -->
-                <div>
-                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Marker Appearance</label>
-                    <select id="setting-shape" class="w-full border border-gray-300 dark:border-gray-600 text-sm rounded-lg p-2 bg-gray-50 dark:bg-gray-700 dark:text-white focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                    <label class="block text-xs font-semibold text-gray-700 mb-2">Marker Appearance</label>
+                    <select id="setting-shape" class="w-full border border-gray-300 text-sm rounded-lg p-2 bg-gray-50 focus:ring-blue-500 focus:border-blue-500">
                         <option value="dot">Classic Dot</option>
                         <option value="pin">Waterdrop Pin</option>
                     </select>
@@ -541,27 +507,27 @@
                 
                 <!-- Custom Marker Color Picker -->
                 <div>
-                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Marker Color</label>
-                    <div class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg p-3 transition-colors">
+                    <label class="block text-xs font-semibold text-gray-700 mb-2">Marker Color</label>
+                    <div class="bg-gray-50 border border-gray-300 rounded-lg p-3">
                         <div class="flex flex-wrap gap-2.5 mb-2" id="quick-colors-marker"></div>
-                        <button type="button" onclick="toggleCustomColor('marker')" class="text-[11px] font-bold text-gray-500 dark:text-gray-400 flex items-center gap-1 hover:text-gray-800 dark:hover:text-gray-200 transition mt-3 outline-none">
+                        <button type="button" onclick="toggleCustomColor('marker')" class="text-[11px] font-bold text-gray-500 flex items-center gap-1 hover:text-gray-800 transition mt-3 outline-none">
                             <i data-lucide="palette" class="w-3.5 h-3.5"></i> <span id="toggle-text-marker">Custom Color</span>
                         </button>
-                        <div id="custom-panel-marker" class="hidden flex-col gap-3 mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                        <div id="custom-panel-marker" class="hidden flex-col gap-3 mt-3 pt-3 border-t border-gray-200">
                             <div class="flex items-center gap-3">
-                                <div id="preview-marker" class="w-8 h-8 rounded shadow-inner border border-gray-300 dark:border-gray-600 shrink-0"></div>
-                                <input type="text" id="hex-input-marker" class="flex-1 text-xs border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded p-1.5 font-mono uppercase focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                                <div id="preview-marker" class="w-8 h-8 rounded shadow-inner border border-gray-300 shrink-0"></div>
+                                <input type="text" id="hex-input-marker" class="flex-1 text-xs border border-gray-300 rounded p-1.5 font-mono uppercase text-gray-700 focus:ring-blue-500 focus:border-blue-500">
                             </div>
                             <div>
-                                <div class="flex justify-between text-[10px] text-gray-500 dark:text-gray-400 font-bold mb-1"><span>Hue</span> <span id="val-h-marker">0°</span></div>
+                                <div class="flex justify-between text-[10px] text-gray-500 font-bold mb-1"><span>Hue</span> <span id="val-h-marker">0°</span></div>
                                 <input type="range" id="slider-h-marker" min="0" max="360" class="w-full h-2 rounded-lg appearance-none outline-none color-slider" style="background: linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%);">
                             </div>
                             <div>
-                                <div class="flex justify-between text-[10px] text-gray-500 dark:text-gray-400 font-bold mb-1"><span>Saturation</span> <span id="val-s-marker">100%</span></div>
+                                <div class="flex justify-between text-[10px] text-gray-500 font-bold mb-1"><span>Saturation</span> <span id="val-s-marker">100%</span></div>
                                 <input type="range" id="slider-s-marker" min="0" max="100" class="w-full h-2 rounded-lg appearance-none outline-none color-slider">
                             </div>
                             <div>
-                                <div class="flex justify-between text-[10px] text-gray-500 dark:text-gray-400 font-bold mb-1"><span>Lightness</span> <span id="val-l-marker">50%</span></div>
+                                <div class="flex justify-between text-[10px] text-gray-500 font-bold mb-1"><span>Lightness</span> <span id="val-l-marker">50%</span></div>
                                 <input type="range" id="slider-l-marker" min="0" max="100" class="w-full h-2 rounded-lg appearance-none outline-none color-slider">
                             </div>
                         </div>
@@ -571,27 +537,27 @@
 
                 <!-- Custom Navigation Line Color Picker -->
                 <div>
-                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Navigation Line Color</label>
-                    <div class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg p-3 transition-colors">
+                    <label class="block text-xs font-semibold text-gray-700 mb-2">Navigation Line Color</label>
+                    <div class="bg-gray-50 border border-gray-300 rounded-lg p-3">
                         <div class="flex flex-wrap gap-2.5 mb-2" id="quick-colors-nav"></div>
-                        <button type="button" onclick="toggleCustomColor('nav')" class="text-[11px] font-bold text-gray-500 dark:text-gray-400 flex items-center gap-1 hover:text-gray-800 dark:hover:text-gray-200 transition mt-3 outline-none">
+                        <button type="button" onclick="toggleCustomColor('nav')" class="text-[11px] font-bold text-gray-500 flex items-center gap-1 hover:text-gray-800 transition mt-3 outline-none">
                             <i data-lucide="palette" class="w-3.5 h-3.5"></i> <span id="toggle-text-nav">Custom Color</span>
                         </button>
-                        <div id="custom-panel-nav" class="hidden flex-col gap-3 mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                        <div id="custom-panel-nav" class="hidden flex-col gap-3 mt-3 pt-3 border-t border-gray-200">
                             <div class="flex items-center gap-3">
-                                <div id="preview-nav" class="w-8 h-8 rounded shadow-inner border border-gray-300 dark:border-gray-600 shrink-0"></div>
-                                <input type="text" id="hex-input-nav" class="flex-1 text-xs border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded p-1.5 font-mono uppercase focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                                <div id="preview-nav" class="w-8 h-8 rounded shadow-inner border border-gray-300 shrink-0"></div>
+                                <input type="text" id="hex-input-nav" class="flex-1 text-xs border border-gray-300 rounded p-1.5 font-mono uppercase text-gray-700 focus:ring-blue-500 focus:border-blue-500">
                             </div>
                             <div>
-                                <div class="flex justify-between text-[10px] text-gray-500 dark:text-gray-400 font-bold mb-1"><span>Hue</span> <span id="val-h-nav">0°</span></div>
+                                <div class="flex justify-between text-[10px] text-gray-500 font-bold mb-1"><span>Hue</span> <span id="val-h-nav">0°</span></div>
                                 <input type="range" id="slider-h-nav" min="0" max="360" class="w-full h-2 rounded-lg appearance-none outline-none color-slider" style="background: linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%);">
                             </div>
                             <div>
-                                <div class="flex justify-between text-[10px] text-gray-500 dark:text-gray-400 font-bold mb-1"><span>Saturation</span> <span id="val-s-nav">100%</span></div>
+                                <div class="flex justify-between text-[10px] text-gray-500 font-bold mb-1"><span>Saturation</span> <span id="val-s-nav">100%</span></div>
                                 <input type="range" id="slider-s-nav" min="0" max="100" class="w-full h-2 rounded-lg appearance-none outline-none color-slider">
                             </div>
                             <div>
-                                <div class="flex justify-between text-[10px] text-gray-500 dark:text-gray-400 font-bold mb-1"><span>Lightness</span> <span id="val-l-nav">50%</span></div>
+                                <div class="flex justify-between text-[10px] text-gray-500 font-bold mb-1"><span>Lightness</span> <span id="val-l-nav">50%</span></div>
                                 <input type="range" id="slider-l-nav" min="0" max="100" class="w-full h-2 rounded-lg appearance-none outline-none color-slider">
                             </div>
                         </div>
@@ -601,64 +567,64 @@
 
                 <!-- OS Map Scaling -->
                 <div>
-                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">OS Map Scaling</label>
-                    <div class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg p-3 space-y-3 transition-colors">
-                        <label class="flex items-center gap-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition p-1 -m-1 rounded">
-                            <input type="checkbox" id="setting-scale-enabled" class="w-4 h-4 text-blue-600 rounded border-gray-300 dark:border-gray-500 focus:ring-blue-500 cursor-pointer">
+                    <label class="block text-xs font-semibold text-gray-700 mb-2">OS Map Scaling</label>
+                    <div class="bg-gray-50 border border-gray-300 rounded-lg p-3 space-y-3">
+                        <label class="flex items-center gap-3 cursor-pointer hover:bg-gray-100 transition p-1 -m-1 rounded">
+                            <input type="checkbox" id="setting-scale-enabled" class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer" onchange="toggleScaleSlider()">
                             <div class="flex flex-col">
-                                <span class="text-sm font-bold text-gray-800 dark:text-gray-100">Enable OS Map Scaling</span>
-                                <span class="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">Adjust OS Maps (Leisure & Road) to match other map types</span>
+                                <span class="text-sm font-bold text-gray-800">Enable OS Map Scaling</span>
+                                <span class="text-[10px] text-gray-500 leading-tight">Adjust OS Maps (Leisure & Road) to match other map types</span>
                             </div>
                         </label>
-                        <div id="scale-slider-container" class="transition-opacity pt-2 border-t border-gray-200 dark:border-gray-600">
-                            <div class="flex justify-between text-[10px] text-gray-500 dark:text-gray-400 font-bold mb-1">
+                        <div id="scale-slider-container" class="transition-opacity pt-2 border-t border-gray-200">
+                            <div class="flex justify-between text-[10px] text-gray-500 font-bold mb-1">
                                 <span>Scale Factor</span>
                                 <span id="val-os-scale">80%</span>
                             </div>
-                            <input type="range" id="setting-scale-factor" min="50" max="100" value="80" class="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none outline-none accent-blue-600 cursor-pointer" oninput="document.getElementById('val-os-scale').innerText = this.value + '%'">
+                            <input type="range" id="setting-scale-factor" min="50" max="100" value="80" class="w-full h-2 bg-gray-200 rounded-lg appearance-none outline-none accent-blue-600 cursor-pointer" oninput="document.getElementById('val-os-scale').innerText = this.value + '%'">
                         </div>
                     </div>
                 </div>
 
                 <!-- OS Map Behavior -->
                 <div>
-                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">OS Map Behavior</label>
-                    <label class="flex items-center gap-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg p-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition">
-                        <input type="checkbox" id="setting-force-25k" class="w-4 h-4 text-blue-600 rounded border-gray-300 dark:border-gray-500 focus:ring-blue-500 cursor-pointer">
+                    <label class="block text-xs font-semibold text-gray-700 mb-2">OS Map Behavior</label>
+                    <label class="flex items-center gap-3 bg-gray-50 border border-gray-300 rounded-lg p-3 cursor-pointer hover:bg-gray-100 transition">
+                        <input type="checkbox" id="setting-force-25k" class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer">
                         <div class="flex flex-col">
-                            <span class="text-sm font-bold text-gray-800 dark:text-gray-100">Force 1:25k at Zoom 7</span>
-                            <span class="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">OS Maps: Scale down the Explorer map instead of showing the Landranger map</span>
+                            <span class="text-sm font-bold text-gray-800">Force 1:25k at Zoom 7</span>
+                            <span class="text-[10px] text-gray-500 leading-tight">OS Maps (Leisure and Roads): Scale down the Explorer map instead of showing the Landranger map</span>
                         </div>
                     </label>
                 </div>
 
             </div>
-            <div class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 rounded-b-xl flex justify-end space-x-3 shrink-0">
-                <button onclick="closeModals()" class="px-4 py-2 text-gray-600 dark:text-gray-300 text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors">Cancel</button>
-                <button onclick="saveSettings()" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 rounded-lg shadow-md transition-colors">Apply</button>
+            <div class="p-3 border-t border-gray-200 bg-gray-50 rounded-b-xl flex justify-end space-x-3 shrink-0">
+                <button onclick="closeModals()" class="px-4 py-2 text-gray-600 text-sm font-medium hover:bg-gray-200 rounded-lg transition">Cancel</button>
+                <button onclick="saveSettings()" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 rounded-lg shadow-md transition">Apply</button>
             </div>
         </div>
 
         <!-- Confirm Dialog -->
-        <div id="confirm-modal" class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col text-center p-6">
-            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/50 mb-4">
-                <i data-lucide="alert-triangle" class="h-6 w-6 text-red-600 dark:text-red-400"></i>
+        <div id="confirm-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col text-center p-6">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                <i data-lucide="alert-triangle" class="h-6 w-6 text-red-600"></i>
             </div>
-            <h3 id="confirm-title" class="text-base font-bold text-gray-900 dark:text-gray-100 mb-2">Are you sure?</h3>
-            <p id="confirm-message" class="text-xs text-gray-500 dark:text-gray-400 mb-6">This action cannot be undone.</p>
+            <h3 id="confirm-title" class="text-base font-bold text-gray-900 mb-2">Are you sure?</h3>
+            <p id="confirm-message" class="text-xs text-gray-500 mb-6">This action cannot be undone.</p>
             <div class="flex justify-center gap-3">
-                <button onclick="closeModals()" class="px-4 py-2 text-gray-700 dark:text-gray-300 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg font-medium transition w-full">Cancel</button>
+                <button onclick="closeModals()" class="px-4 py-2 text-gray-700 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition w-full">Cancel</button>
                 <button id="confirm-action-btn" class="px-4 py-2 bg-red-600 text-white text-sm hover:bg-red-700 rounded-lg font-medium shadow-md transition w-full">Confirm</button>
             </div>
         </div>
 
         <!-- Alert Dialog -->
-        <div id="alert-modal" class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col text-center p-6">
-            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/50 mb-4">
-                <i data-lucide="info" class="h-6 w-6 text-blue-600 dark:text-blue-400"></i>
+        <div id="alert-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col text-center p-6">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4">
+                <i data-lucide="info" class="h-6 w-6 text-blue-600"></i>
             </div>
-            <h3 id="alert-title" class="text-base font-bold text-gray-900 dark:text-gray-100 mb-2">Information</h3>
-            <p id="alert-message" class="text-xs text-gray-500 dark:text-gray-400 mb-6">Message</p>
+            <h3 id="alert-title" class="text-base font-bold text-gray-900 mb-2">Information</h3>
+            <p id="alert-message" class="text-xs text-gray-500 mb-6">Message</p>
             <button onclick="closeModals()" class="px-4 py-2 bg-blue-600 text-white text-sm hover:bg-blue-700 rounded-lg font-medium shadow-md transition w-full">OK</button>
         </div>
 
@@ -916,9 +882,8 @@
         let globalMarkerShape = 'dot';
         let globalNavColor = '#2563eb'; // Default tailwind blue
         let globalForce25kAtZoom7 = false; // OS Maps override setting
-        let globalOSMapScalingEnabled = false; // OS Map scaling setting (defaults OFF)
+        let globalOSMapScalingEnabled = true;
         let globalOSMapScaleFactor = 80;
-        let globalDarkMode = false;
         
         let initialCenter = [51.505, -0.09];
         let initialZoom = 10;
@@ -1175,7 +1140,7 @@
             mapMarkers = [];
         }
 
-        let baseMapDefs = [
+        const baseMapDefs = [
             { id: 'os_combined', name: 'OS Maps (Leisure & Road)', icon: 'map' },
             { id: 'bing_os', name: 'Bing OS Legacy', icon: 'map' },
             { id: 'osm', name: 'OpenStreetMap', icon: 'globe' },
@@ -1223,17 +1188,16 @@
 
         // --- OS Map Layer Generation ---
         function getOSLayerGroup() {
-            const osAttribution = '&copy; <a href="https://www.ordnancesurvey.co.uk/" target="_blank">Ordnance Survey</a> Crown copyright and database rights ' + new Date().getFullYear();
             if (globalForce25kAtZoom7) {
                 return L.layerGroup([
-                    L.tileLayer(`https://api.os.uk/maps/raster/v1/zxy/Leisure_27700/{z}/{x}/{y}.png?key=${osApiKey}`, { maxZoom: 6, attribution: osAttribution }),
-                    L.tileLayer(`https://api.os.uk/maps/raster/v1/zxy/Leisure_27700/{z}/{x}/{y}.png?key=${osApiKey}`, { minZoom: 7, maxZoom: 9, minNativeZoom: 8, attribution: osAttribution }),
-                    L.tileLayer(`https://api.os.uk/maps/raster/v1/zxy/Road_27700/{z}/{x}/{y}.png?key=${osApiKey}`, { minZoom: 10, maxZoom: 13, attribution: osAttribution })
+                    L.tileLayer(`https://api.os.uk/maps/raster/v1/zxy/Leisure_27700/{z}/{x}/{y}.png?key=${osApiKey}`, { maxZoom: 6 }),
+                    L.tileLayer(`https://api.os.uk/maps/raster/v1/zxy/Leisure_27700/{z}/{x}/{y}.png?key=${osApiKey}`, { minZoom: 7, maxZoom: 9, minNativeZoom: 8 }),
+                    L.tileLayer(`https://api.os.uk/maps/raster/v1/zxy/Road_27700/{z}/{x}/{y}.png?key=${osApiKey}`, { minZoom: 10, maxZoom: 13 })
                 ]);
             } else {
                 return L.layerGroup([
-                    L.tileLayer(`https://api.os.uk/maps/raster/v1/zxy/Leisure_27700/{z}/{x}/{y}.png?key=${osApiKey}`, { maxZoom: 9, attribution: osAttribution }),
-                    L.tileLayer(`https://api.os.uk/maps/raster/v1/zxy/Road_27700/{z}/{x}/{y}.png?key=${osApiKey}`, { minZoom: 10, maxZoom: 13, attribution: osAttribution })
+                    L.tileLayer(`https://api.os.uk/maps/raster/v1/zxy/Leisure_27700/{z}/{x}/{y}.png?key=${osApiKey}`, { maxZoom: 9 }),
+                    L.tileLayer(`https://api.os.uk/maps/raster/v1/zxy/Road_27700/{z}/{x}/{y}.png?key=${osApiKey}`, { minZoom: 10, maxZoom: 13 })
                 ]);
             }
         }
@@ -1251,7 +1215,6 @@
         // --- Init ---
         async function initApp() {
             loadSettingsFromStorage();
-            loadBaseMapOrder(); // Restore user map ordering preferences
             initMap();
             initWarpImageMap();
             loadMarkersFromStorage();
@@ -1268,37 +1231,7 @@
             updateOpacitySliderVisibility();
         }
         
-        function applyDarkMode() {
-            if (globalDarkMode) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-        }
-
         // --- Drag and Drop Sorting Init ---
-        function saveBaseMapOrder() {
-            const order = baseMapDefs.map(m => m.id);
-            localStorage.setItem('maverish_basemap_order', JSON.stringify(order));
-        }
-
-        function loadBaseMapOrder() {
-            const savedData = localStorage.getItem('maverish_basemap_order');
-            if (savedData) {
-                try {
-                    const orderIds = JSON.parse(savedData);
-                    baseMapDefs.sort((a, b) => {
-                        let idxA = orderIds.indexOf(a.id);
-                        let idxB = orderIds.indexOf(b.id);
-                        // If new maps were added that aren't in the saved order, append them at the end
-                        if (idxA === -1) idxA = 999;
-                        if (idxB === -1) idxB = 999;
-                        return idxA - idxB;
-                    });
-                } catch(e) { console.error("Failed to load map order", e); }
-            }
-        }
-
         function initSortableLists() {
             Sortable.create(document.getElementById('base-map-list'), {
                 handle: '.drag-handle',
@@ -1307,7 +1240,6 @@
                     if (evt.oldIndex === evt.newIndex) return;
                     const moved = baseMapDefs.splice(evt.oldIndex, 1)[0];
                     baseMapDefs.splice(evt.newIndex, 0, moved);
-                    saveBaseMapOrder(); // Persist changes
                     renderBaseMapsList(); // Resync DOM cleanly
                 }
             });
@@ -1541,8 +1473,8 @@
             
             const btn = document.getElementById('btn-delete-point');
             if (isDeletingPoint) {
-                btn.classList.remove('bg-white', 'text-gray-700', 'border-gray-300', 'dark:bg-gray-700', 'dark:text-gray-200', 'dark:border-gray-600');
-                btn.classList.add('bg-red-600', 'text-white', 'border-red-600', 'dark:bg-red-700', 'dark:border-red-700');
+                btn.classList.remove('bg-white', 'text-gray-700', 'border-gray-300');
+                btn.classList.add('bg-red-600', 'text-white', 'border-red-600');
                 btn.innerText = 'Tap a Pt';
             } else {
                 resetDeletePointMode();
@@ -1553,8 +1485,8 @@
             isDeletingPoint = false;
             const btn = document.getElementById('btn-delete-point');
             if (btn) {
-                btn.classList.add('bg-white', 'text-gray-700', 'border-gray-300', 'dark:bg-gray-700', 'dark:text-gray-200', 'dark:border-gray-600');
-                btn.classList.remove('bg-red-600', 'text-white', 'border-red-600', 'dark:bg-red-700', 'dark:border-red-700');
+                btn.classList.add('bg-white', 'text-gray-700', 'border-gray-300');
+                btn.classList.remove('bg-red-600', 'text-white', 'border-red-600');
                 btn.innerText = 'Delete Pt';
             }
         }
@@ -1657,19 +1589,19 @@
             const container = document.getElementById('base-map-list');
             container.innerHTML = baseMapDefs.map(m => {
                 const isActive = m.id === currentMapType;
-                const activeClass = isActive ? 'bg-blue-50 dark:bg-blue-900/40 rounded-lg' : '';
-                const pulse = isActive ? '<span class="w-1.5 h-1.5 bg-blue-600 dark:bg-blue-400 rounded-full flex-shrink-0 animate-pulse mr-2"></span>' : '';
+                const activeClass = isActive ? 'bg-blue-50 rounded-lg' : '';
+                const pulse = isActive ? '<span class="w-1.5 h-1.5 bg-blue-600 rounded-full flex-shrink-0 animate-pulse mr-2"></span>' : '';
                 return `
-                    <div class="p-2 relative border-b border-gray-100 dark:border-gray-700 last:border-0 transition-colors ${activeClass}">
+                    <div class="p-2 relative border-b border-gray-100 last:border-0 transition-colors ${activeClass}">
                         <div class="flex items-center justify-between gap-2">
                             <div class="flex items-center min-w-0 flex-grow gap-2 cursor-pointer" onclick="changeBaseMap('${m.id}')">
-                                <i data-lucide="grip-vertical" class="drag-handle w-4 h-4 text-gray-400 cursor-grab shrink-0 hover:text-gray-600 dark:hover:text-gray-200"></i>
+                                <i data-lucide="grip-vertical" class="drag-handle w-4 h-4 text-gray-400 cursor-grab shrink-0 hover:text-gray-600"></i>
                                 ${pulse}
-                                <span class="text-sm font-bold text-gray-800 dark:text-gray-100 truncate">${m.name}</span>
+                                <span class="text-sm font-bold text-gray-800 truncate">${m.name}</span>
                             </div>
-                            <div class="flex items-center space-x-1 shrink-0 bg-gray-50 dark:bg-gray-700 rounded-lg p-0.5">
-                                <button onclick="changeBaseMap('${m.id}')" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition" title="Select Map">
-                                    <i data-lucide="${m.icon}" class="w-4 h-4 ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-300'}"></i>
+                            <div class="flex items-center space-x-1 shrink-0 bg-gray-50 rounded-lg p-0.5">
+                                <button onclick="changeBaseMap('${m.id}')" class="p-1 hover:bg-gray-200 rounded transition" title="Select Map">
+                                    <i data-lucide="${m.icon}" class="w-4 h-4 ${isActive ? 'text-blue-600' : 'text-gray-500'}"></i>
                                 </button>
                             </div>
                         </div>
@@ -1720,13 +1652,9 @@
         function showModal(id) {
             if (closeModalsTimeout) clearTimeout(closeModalsTimeout);
             const overlay = document.getElementById('modal-overlay');
-            
-            overlay.classList.remove('hidden');
-            // Force a reflow so the transition applies smoothly
-            void overlay.offsetWidth;
-            
-            overlay.classList.remove('opacity-0', 'pointer-events-none');
-            overlay.classList.add('opacity-100', 'pointer-events-auto');
+            overlay.classList.remove('modal-fade-out');
+            overlay.classList.add('modal-fade-in');
+            overlay.style.pointerEvents = '';
 
             ['settings-modal','confirm-modal','alert-modal','compass-modal', 'add-menu-modal', 'crop-modal'].forEach(modalId => {
                 const el = document.getElementById(modalId);
@@ -1742,11 +1670,9 @@
 
         function closeModals() {
             const overlay = document.getElementById('modal-overlay');
-            overlay.classList.remove('opacity-100', 'pointer-events-auto');
-            overlay.classList.add('opacity-0', 'pointer-events-none');
-            
+            overlay.classList.remove('modal-fade-in');
+            overlay.classList.add('modal-fade-out');
             closeModalsTimeout = setTimeout(() => {
-                overlay.classList.add('hidden');
                 ['settings-modal','confirm-modal','alert-modal','compass-modal', 'add-menu-modal', 'crop-modal'].forEach(modalId => {
                     const el = document.getElementById(modalId);
                     if (el) { el.classList.add('hidden'); el.style.display = ''; }
@@ -2161,8 +2087,6 @@
                 advBtn.classList.replace('bg-gray-100', 'bg-blue-600');
                 advBtn.classList.replace('text-gray-700', 'text-white');
                 advBtn.classList.replace('border-gray-200', 'border-blue-700');
-                advBtn.classList.replace('dark:bg-gray-700', 'dark:bg-blue-600');
-                advBtn.classList.replace('dark:border-gray-600', 'dark:border-blue-500');
                 
                 centerBtn.classList.add('opacity-50', 'pointer-events-none');
                 
@@ -2189,8 +2113,6 @@
                 advBtn.classList.replace('bg-blue-600', 'bg-gray-100');
                 advBtn.classList.replace('text-white', 'text-gray-700');
                 advBtn.classList.replace('border-blue-700', 'border-gray-200');
-                advBtn.classList.replace('dark:bg-blue-600', 'dark:bg-gray-700');
-                advBtn.classList.replace('dark:border-blue-500', 'dark:border-gray-600');
 
                 centerBtn.classList.remove('opacity-50', 'pointer-events-none');
 
@@ -2296,7 +2218,7 @@
                 if (reqId) { cancelAnimationFrame(reqId); reqId = null; }
             };
             btn.addEventListener('mousedown', start); btn.addEventListener('mouseup', stop); btn.addEventListener('mouseleave', stop);
-            btn.addEventListener('touchstart', start, {passive: false}); btn.addEventListener('touchcancel', stop, {passive: false}); btn.addEventListener('touchcancel', stop, {passive: false});
+            btn.addEventListener('touchstart', start, {passive: false}); btn.addEventListener('touchend', stop, {passive: false}); btn.addEventListener('touchcancel', stop, {passive: false});
         }
 
         function setupOverlayHoldControls() {
@@ -2557,24 +2479,24 @@
 
             overlays.forEach(o => {
                 const isActive = o.id === activeOverlayId;
-                const pulse = isActive ? '<span class="w-1.5 h-1.5 bg-blue-600 dark:bg-blue-400 rounded-full flex-shrink-0 animate-pulse mr-2"></span>' : '';
+                const pulse = isActive ? '<span class="w-1.5 h-1.5 bg-blue-600 rounded-full flex-shrink-0 animate-pulse mr-2"></span>' : '';
                 
                 const item = document.createElement('div');
-                item.className = `p-2 relative border-b border-gray-100 dark:border-gray-700 last:border-0 ${isActive ? 'bg-blue-50 dark:bg-blue-900/40 rounded-lg' : ''}`;
+                item.className = `p-2 relative border-b border-gray-100 last:border-0 ${isActive ? 'bg-blue-50 rounded-lg' : ''}`;
                 
                 item.innerHTML = `
                     <div class="flex items-center justify-between gap-2">
                         <div class="flex items-center min-w-0 flex-grow gap-2">
-                            <i data-lucide="grip-vertical" class="drag-handle w-4 h-4 text-gray-400 cursor-grab shrink-0 hover:text-gray-600 dark:hover:text-gray-200"></i>
+                            <i data-lucide="grip-vertical" class="drag-handle w-4 h-4 text-gray-400 cursor-grab shrink-0 hover:text-gray-600"></i>
                             <div class="flex-grow cursor-pointer flex items-center overflow-hidden min-w-0" onclick="activateOverlay('${o.id}')">
                                 ${pulse}
-                                <span class="text-sm font-bold text-gray-800 dark:text-gray-100 truncate">${escapeHTML(o.name)}</span>
+                                <span class="text-sm font-bold text-gray-800 truncate">${escapeHTML(o.name)}</span>
                             </div>
                         </div>
-                        <div class="flex items-center space-x-1 shrink-0 bg-gray-50 dark:bg-gray-700 rounded-lg p-0.5">
-                            <button onclick="centerOnOverlay('${o.id}')" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-gray-700 dark:text-gray-300 transition" title="Go to Saved View"><i data-lucide="crosshair" class="w-4 h-4"></i></button>
-                            <button onclick="editOverlayFromList('${o.id}')" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-blue-600 dark:text-blue-400 transition" title="Adjust"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
-                            <button onclick="confirmDeleteOverlay('${o.id}')" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-red-600 dark:text-red-400 transition" title="Delete"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        <div class="flex items-center space-x-1 shrink-0 bg-gray-50 rounded-lg p-0.5">
+                            <button onclick="centerOnOverlay('${o.id}')" class="p-1 hover:bg-gray-200 rounded text-gray-700 transition" title="Go to Saved View"><i data-lucide="crosshair" class="w-4 h-4"></i></button>
+                            <button onclick="editOverlayFromList('${o.id}')" class="p-1 hover:bg-gray-200 rounded text-blue-600 transition" title="Adjust"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
+                            <button onclick="confirmDeleteOverlay('${o.id}')" class="p-1 hover:bg-gray-200 rounded text-red-600 transition" title="Delete"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                         </div>
                     </div>
                 `;
@@ -2840,12 +2762,10 @@
                 if (isAutoCentering) {
                     btn.classList.add('bg-blue-100', 'border-blue-300');
                     btn.classList.remove('bg-white', 'border-gray-200');
-                    btn.classList.remove('dark:bg-gray-800', 'dark:border-gray-700');
                     icon.classList.add('text-blue-800'); icon.classList.remove('text-blue-600');
                 } else {
                     btn.classList.remove('bg-blue-100', 'border-blue-300');
                     btn.classList.add('bg-white', 'border-gray-200');
-                    btn.classList.add('dark:bg-gray-800', 'dark:border-gray-700');
                     icon.classList.remove('text-blue-800'); icon.classList.add('text-blue-600');
                 }
             }
@@ -2942,27 +2862,27 @@
             markers.forEach(m => {
                 const isNav = (navigatingToId === m.id);
                 const eyeIcon = m.isVisible ? 'eye' : 'eye-off';
-                const eyeColor = m.isVisible ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500';
+                const eyeColor = m.isVisible ? 'text-blue-600' : 'text-gray-400';
                 
                 const item = document.createElement('div');
-                item.className = `p-2 relative border-b border-gray-100 dark:border-gray-700 last:border-0 ${isNav ? 'bg-green-50 dark:bg-green-900/40 rounded-lg' : ''}`;
+                item.className = `p-2 relative border-b border-gray-100 last:border-0 ${isNav ? 'bg-green-50 rounded-lg' : ''}`;
                 
                 item.innerHTML = `
                     <div class="flex items-center justify-between gap-2">
                         <div class="flex items-center min-w-0 flex-grow gap-2">
-                            <i data-lucide="grip-vertical" class="drag-handle w-4 h-4 text-gray-400 cursor-grab shrink-0 hover:text-gray-600 dark:hover:text-gray-200"></i>
-                            ${isNav ? '<i data-lucide="navigation-2" class="w-4 h-4 text-green-600 dark:text-green-400 shrink-0"></i>' : ''}
-                            <h4 class="text-sm font-bold text-gray-800 dark:text-gray-100 truncate">${escapeHTML(m.name)}</h4>
+                            <i data-lucide="grip-vertical" class="drag-handle w-4 h-4 text-gray-400 cursor-grab shrink-0 hover:text-gray-600"></i>
+                            ${isNav ? '<i data-lucide="navigation-2" class="w-4 h-4 text-green-600 shrink-0"></i>' : ''}
+                            <h4 class="text-sm font-bold text-gray-800 truncate">${escapeHTML(m.name)}</h4>
                         </div>
-                        <div class="flex items-center space-x-1 shrink-0 bg-gray-50 dark:bg-gray-700 rounded-lg p-0.5">
-                            <button onclick="centerOnMarker('${m.id}')" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-gray-700 dark:text-gray-300 transition" title="Center View"><i data-lucide="crosshair" class="w-4 h-4"></i></button>
+                        <div class="flex items-center space-x-1 shrink-0 bg-gray-50 rounded-lg p-0.5">
+                            <button onclick="centerOnMarker('${m.id}')" class="p-1 hover:bg-gray-200 rounded text-gray-700 transition" title="Center View"><i data-lucide="crosshair" class="w-4 h-4"></i></button>
                             ${isNav ? 
-                                `<button onclick="stopNavigation()" class="p-1 hover:bg-red-200 dark:hover:bg-red-900/50 rounded text-red-600 dark:text-red-400 transition" title="Stop Navigating"><i data-lucide="square" class="w-4 h-4 fill-current"></i></button>` :
-                                `<button onclick="startNavigation('${m.id}')" class="p-1 hover:bg-blue-200 dark:hover:bg-blue-900/50 rounded text-blue-600 dark:text-blue-400 transition" title="Navigate"><i data-lucide="navigation" class="w-4 h-4"></i></button>`
+                                `<button onclick="stopNavigation()" class="p-1 hover:bg-red-200 rounded text-red-600 transition" title="Stop Navigating"><i data-lucide="square" class="w-4 h-4 fill-current"></i></button>` :
+                                `<button onclick="startNavigation('${m.id}')" class="p-1 hover:bg-blue-200 rounded text-blue-600 transition" title="Navigate"><i data-lucide="navigation" class="w-4 h-4"></i></button>`
                             }
-                            <button onclick="openPanelForEdit('point', '${m.id}')" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-blue-600 dark:text-blue-400 transition" title="Edit"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
-                            <button onclick="toggleMarkerVisibility('${m.id}')" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition" ${isNav ? 'disabled title="Cannot hide while navigating"' : 'title="Visibility"'}><i data-lucide="${eyeIcon}" class="w-4 h-4 ${isNav ? 'text-gray-300 dark:text-gray-600' : eyeColor}"></i></button>
-                            <button onclick="confirmDeleteMarker('${m.id}')" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-red-600 dark:text-red-400 transition" ${isNav ? 'disabled' : ''}><i data-lucide="trash-2" class="w-4 h-4 ${isNav ? 'text-gray-300 dark:text-gray-600' : ''}"></i></button>
+                            <button onclick="openPanelForEdit('point', '${m.id}')" class="p-1 hover:bg-gray-200 rounded text-blue-600 transition" title="Edit"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
+                            <button onclick="toggleMarkerVisibility('${m.id}')" class="p-1 hover:bg-gray-200 rounded transition" ${isNav ? 'disabled title="Cannot hide while navigating"' : 'title="Visibility"'}><i data-lucide="${eyeIcon}" class="w-4 h-4 ${isNav ? 'text-gray-300' : eyeColor}"></i></button>
+                            <button onclick="confirmDeleteMarker('${m.id}')" class="p-1 hover:bg-gray-200 rounded text-red-600 transition" ${isNav ? 'disabled' : ''}><i data-lucide="trash-2" class="w-4 h-4 ${isNav ? 'text-gray-300' : ''}"></i></button>
                         </div>
                     </div>
                 `;
@@ -2975,12 +2895,12 @@
         function getPopupContent(m) {
             return `
                 <div class="text-center min-w-[100px] p-1">
-                    <b class="block mb-3 text-sm font-bold">${escapeHTML(m.name)}</b>
+                    <b class="block mb-3 text-sm text-gray-800">${escapeHTML(m.name)}</b>
                     <div class="flex gap-2 justify-center">
-                        <button onclick="openPanelForEdit('point', '${m.id}'); map.closePopup();" class="flex-1 flex justify-center items-center bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200 p-2 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors" title="Edit">
+                        <button onclick="openPanelForEdit('point', '${m.id}'); map.closePopup();" class="flex-1 flex justify-center items-center bg-blue-100 text-blue-700 p-2 rounded hover:bg-blue-200 transition-colors" title="Edit">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
                         </button>
-                        <button onclick="startNavigation('${m.id}'); map.closePopup();" class="flex-1 flex justify-center items-center bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200 p-2 rounded hover:bg-green-200 dark:hover:bg-green-800 transition-colors" title="Navigate">
+                        <button onclick="startNavigation('${m.id}'); map.closePopup();" class="flex-1 flex justify-center items-center bg-green-100 text-green-700 p-2 rounded hover:bg-green-200 transition-colors" title="Navigate">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
                         </button>
                     </div>
@@ -3193,7 +3113,6 @@
         
         function openSettingsModal() {
             closeDrawerIfOpen();
-            document.getElementById('setting-dark-mode').checked = globalDarkMode;
             document.getElementById('setting-force-25k').checked = globalForce25kAtZoom7;
             document.getElementById('setting-shape').value = globalMarkerShape;
             
@@ -3221,7 +3140,6 @@
             const newForce25k = document.getElementById('setting-force-25k').checked;
             const osSettingsChanged = newForce25k !== globalForce25kAtZoom7;
             
-            globalDarkMode = document.getElementById('setting-dark-mode').checked;
             globalMarkerColor = document.getElementById('setting-color').value;
             globalMarkerShape = document.getElementById('setting-shape').value;
             globalNavColor = document.getElementById('setting-nav-color').value;
@@ -3233,8 +3151,6 @@
             if (navPolyline) {
                 navPolyline.setStyle({ color: globalNavColor });
             }
-            
-            applyDarkMode();
             
             // Swap layer cleanly if the user is currently looking at the OS map
             if (osSettingsChanged && currentMapType === 'os_combined') {
@@ -3262,10 +3178,6 @@
             if (saved) {
                 try {
                     const parsed = JSON.parse(saved);
-                    if (parsed.darkMode !== undefined) {
-                        globalDarkMode = parsed.darkMode;
-                        applyDarkMode();
-                    }
                     if (parsed.color) globalMarkerColor = parsed.color;
                     if (parsed.shape) globalMarkerShape = parsed.shape;
                     if (parsed.navColor) globalNavColor = parsed.navColor;
@@ -3285,8 +3197,7 @@
                 color: globalMarkerColor, shape: globalMarkerShape, navColor: globalNavColor, mapType: currentMapType,
                 center: map.getCenter(), zoom: map.getZoom(),
                 force25k: globalForce25kAtZoom7,
-                scaleEnabled: globalOSMapScalingEnabled, scaleFactor: globalOSMapScaleFactor,
-                darkMode: globalDarkMode
+                scaleEnabled: globalOSMapScalingEnabled, scaleFactor: globalOSMapScaleFactor
             };
             localStorage.setItem('maverish_settings', JSON.stringify(settings));
         }
@@ -3307,58 +3218,58 @@
             initApp();
             
             // Register Service Worker for PWA with Update Management
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(reg => {
-                        console.log('ServiceWorker registered');
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+        .then(reg => {
+            console.log('ServiceWorker registered');
 
-                        // 1. Check if an updated worker is already waiting (e.g. user refreshed but didn't update yet)
-                        if (reg.waiting) {
-                            showUpdateToast(reg.waiting);
-                        }
+            // 1. Check if an updated worker is already waiting (e.g. user refreshed but didn't update yet)
+            if (reg.waiting) {
+                showUpdateToast(reg.waiting);
+            }
 
-                        // 2. Listen for future updates installing in the background
-                        reg.addEventListener('updatefound', () => {
-                            const newWorker = reg.installing;
-                            newWorker.addEventListener('statechange', () => {
-                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    // The update has safely finished pre-caching in the background
-                                    showUpdateToast(newWorker);
-                                }
-                            });
-                        });
-                    })
-                    .catch(err => console.log('ServiceWorker failed: ', err));
-
-                // 3. Automatically reload the tab once the new Service Worker gains active control
-                let refreshing = false;
-                navigator.serviceWorker.addEventListener('controllerchange', () => {
-                    if (!refreshing) {
-                        window.location.reload();
-                        refreshing = true;
+            // 2. Listen for future updates installing in the background
+            reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        // The update has safely finished pre-caching in the background
+                        showUpdateToast(newWorker);
                     }
                 });
-            }
+            });
+        })
+        .catch(err => console.log('ServiceWorker failed: ', err));
 
-            // Helper function to expose the toast and attach click action
-            function showUpdateToast(worker) {
-                const toast = document.getElementById('pwa-update-toast');
-                const btn = document.getElementById('pwa-update-btn');
-                if (!toast || !btn) return;
+    // 3. Automatically reload the tab once the new Service Worker gains active control
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+            window.location.reload();
+            refreshing = true;
+        }
+    });
+}
 
-                // Make toast visible
-                toast.classList.remove('hidden');
-                
-                // Re-initialize Lucide icons in case the node icon needs initialization
-                if (window.lucide) {
-                    window.lucide.createIcons();
-                }
+// Helper function to expose the toast and attach click action
+function showUpdateToast(worker) {
+    const toast = document.getElementById('pwa-update-toast');
+    const btn = document.getElementById('pwa-update-btn');
+    if (!toast || !btn) return;
 
-                // On user confirmation, pass the skip waiting command
-                btn.onclick = () => {
-                    worker.postMessage({ type: 'SKIP_WAITING' });
-                };
-            }
+    // Make toast visible
+    toast.classList.remove('hidden');
+    
+    // Re-initialize Lucide icons in case the node icon needs initialization
+    if (window.lucide) {
+        window.lucide.createIcons();
+    }
+
+    // On user confirmation, pass the skip waiting command
+    btn.onclick = () => {
+        worker.postMessage({ type: 'SKIP_WAITING' });
+    };
+}
         };
 
     </script>
