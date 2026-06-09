@@ -93,7 +93,7 @@
             animation: pulse 2s infinite;
         }
         @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            0 { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
             70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
             100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
         }
@@ -955,7 +955,6 @@
         let cropper = null;
 
         // --- Custom Color Picker Setup ---
-        // Removed purple (#8b5cf6) and light blue (#0ea5e9) from preset list
         const quickColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#ec4899', '#64748b', '#000000'];
 
         function hexToHSL(hex) {
@@ -1290,7 +1289,6 @@
                     baseMapDefs.sort((a, b) => {
                         let idxA = orderIds.indexOf(a.id);
                         let idxB = orderIds.indexOf(b.id);
-                        // If new maps were added that aren't in the saved order, append them at the end
                         if (idxA === -1) idxA = 999;
                         if (idxB === -1) idxB = 999;
                         return idxA - idxB;
@@ -1307,8 +1305,8 @@
                     if (evt.oldIndex === evt.newIndex) return;
                     const moved = baseMapDefs.splice(evt.oldIndex, 1)[0];
                     baseMapDefs.splice(evt.newIndex, 0, moved);
-                    saveBaseMapOrder(); // Persist changes
-                    renderBaseMapsList(); // Resync DOM cleanly
+                    saveBaseMapOrder();
+                    renderBaseMapsList();
                 }
             });
 
@@ -1321,7 +1319,7 @@
                     const moved = markers.splice(evt.oldIndex, 1)[0];
                     markers.splice(evt.newIndex, 0, moved);
                     saveMarkersToStorage();
-                    renderMarkerList(); // Resync DOM cleanly
+                    renderMarkerList();
                 }
             });
 
@@ -1334,7 +1332,7 @@
                     const moved = overlays.splice(evt.oldIndex, 1)[0];
                     overlays.splice(evt.newIndex, 0, moved);
                     saveOverlaysMeta();
-                    renderOverlayList(); // Resync DOM cleanly
+                    renderOverlayList();
                 }
             });
         }
@@ -1420,7 +1418,6 @@
                 if (m.isVisible) m.leafletMarker.addTo(map);
             });
             
-            // Clean recreate of the nav line
             if (navigatingToId) {
                 navPolyline = L.polyline([], { color: globalNavColor, weight: 3, dashArray: '10, 10' }).addTo(map);
                 updateNavigation();
@@ -1443,7 +1440,7 @@
             map.on('dragstart', () => { if (isAutoCentering) { isAutoCentering = false; updateCenterButtonUI(); } });
             
             map.on('click', (e) => {
-                if (isDeletingPoint) return; // Prevent mapping actions while in delete point mode
+                if (isDeletingPoint) return;
 
                 if (isPlacingOverlay) {
                     isPlacingOverlay = false;
@@ -1452,7 +1449,6 @@
                     
                     imgCenter = e.latlng;
                     
-                    // Automatically calculate scale boundaries ONLY on fresh, unscaled placement (imgWidthLng = 0)
                     if (imgWidthLng === 0) {
                         imgRotation = 0;
                         imgOpacity = parseInt(document.getElementById('floating-opacity-slider').value) || 60;
@@ -1471,14 +1467,13 @@
                     animateMapSqueeze(true);
                     updateOpacitySliderVisibility();
                 } else if (isBottomPanelOpen && document.getElementById('edit-item-type').value === 'overlay' && overlayMode === 'warp') {
-                    // Warp point setting click inside main map
                     if (currentWarpStep !== 'map') return;
                     
                     const pointIdx = warpPoints.length - 1;
                     warpPoints[pointIdx].map = e.latlng;
                     currentWarpStep = 'img';
                     
-                    rebuildWarpMarkersOnMap(); // Rebuilds array natively providing events
+                    rebuildWarpMarkersOnMap();
                     
                     if (warpPoints.length >= 3) renderRubberSheetOverlay();
                 }
@@ -1508,7 +1503,7 @@
         // --- Warp Image Map setup ---
         function setupWarpImageMapListeners() {
             warpImageMap.on('click', function(e) {
-                if (isDeletingPoint) return; // Prevent creating points while deleting
+                if (isDeletingPoint) return;
                 if (!activeOverlayImgBlob) return;
                 if (currentWarpStep !== 'img') return;
 
@@ -1562,11 +1557,9 @@
         function handleWarpMarkerClick(index) {
             if (!isDeletingPoint) return;
             
-            // Remove the selected point pair
             warpPoints.splice(index, 1);
             resetDeletePointMode();
             
-            // Re-render markers and recalculate mesh
             rebuildWarpMarkersOnMap();
             
             if (warpPoints.filter(p => p.map !== null).length >= 3) {
@@ -1695,7 +1688,6 @@
                     currentBaseLayer = mapLayers[newId];
                     currentBaseLayer.addTo(map);
                     
-                    // Safely keep active items on top natively without custom panes
                     try {
                         if (leafletImageOverlay && typeof leafletImageOverlay.bringToFront === 'function') leafletImageOverlay.bringToFront();
                         if (leafletRubberSheetOverlay && typeof leafletRubberSheetOverlay.bringToFront === 'function') leafletRubberSheetOverlay.bringToFront();
@@ -1705,7 +1697,6 @@
                 applyMapScale();
                 saveMapState();
             } finally {
-                // Ensure highlighting applies regardless of layer errors
                 renderBaseMapsList();
             }
         }
@@ -1722,7 +1713,6 @@
             const overlay = document.getElementById('modal-overlay');
             
             overlay.classList.remove('hidden');
-            // Force a reflow so the transition applies smoothly
             void overlay.offsetWidth;
             
             overlay.classList.remove('opacity-0', 'pointer-events-none');
@@ -1771,8 +1761,6 @@
             const step = () => {
                 map.invalidateSize({ pan: false });
                 
-                // Rigidly lock the geographical coordinate to the physical center of the map container
-                // This keeps the crosshair pointed exactly at the location it was previously pointing at
                 if (!targetLatLng) {
                     map.setView(centerToLock, currentZoom, { animate: false });
                 }
@@ -1788,7 +1776,6 @@
             requestAnimationFrame(step); 
 
             if (targetLatLng) {
-                // If the user requested to view a specific point, fly to it after layout adjusts
                 setTimeout(() => {
                     map.flyTo(targetLatLng, map.getZoom(), { animate: true, duration: 0.5 });
                 }, 350);
@@ -1814,22 +1801,22 @@
             document.getElementById('map').classList.remove('map-squeezed');
             document.getElementById('ui-layer').classList.remove('map-squeezed');
             document.getElementById('bottom-panel').classList.remove('panel-open');
-            document.getElementById('bottom-panel').style.height = ''; // Reset height to default
+            document.getElementById('bottom-panel').style.height = ''; 
             document.getElementById('bottom-panel').classList.add('panel-closed');
             isBottomPanelOpen = false;
             
             resetDeletePointMode();
-            removeAllWarpMarkers(); // Safely purge markers when closing
+            removeAllWarpMarkers(); 
             animateMapSqueeze(false);
             updateOpacitySliderVisibility();
         }
 
         function openPanelForNew(type) {
             if (window.innerWidth < 768) closeDrawerIfOpen();
-            overlayMode = 'standard'; // Default new is standard mode
+            overlayMode = 'standard'; 
 
             if (type === 'overlay') {
-                unloadOverlay(); // Guarantees a clean blank slate state
+                unloadOverlay(); 
                 imgWidthLng = 0; 
             }
 
@@ -1879,7 +1866,7 @@
             const delBtn = document.getElementById('panel-delete-btn');
 
             if (type === 'point') {
-                bPanel.style.height = ''; // Reset height
+                bPanel.style.height = ''; 
                 mapContainer.classList.add('map-squeezed');
                 uiLayer.classList.add('map-squeezed');
 
@@ -1894,13 +1881,13 @@
                     delBtn.onclick = () => confirmDeleteMarker(editId);
                     
                     tempPickedCoords = { lat: m.lat, lng: m.lng };
-                    document.getElementById('coord-format').value = 'dd'; // Safer format on edit so pan doesn't snap
+                    document.getElementById('coord-format').value = 'dd'; 
                     document.getElementById('picked-coords-display').innerText = `${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}`;
                     document.getElementById('dd-lat').value = m.lat.toFixed(6);
                     document.getElementById('dd-lng').value = m.lng.toFixed(6);
                     
                     let tempAnim = isMapAnimating;
-                    isMapAnimating = true; // Suspend map view updates while setting UI
+                    isMapAnimating = true; 
                     syncCoords('dd');
                     isMapAnimating = tempAnim;
                 } else {
@@ -1916,7 +1903,7 @@
                     document.getElementById('dd-lng').value = center.lng.toFixed(6);
                     
                     let tempAnim = isMapAnimating;
-                    isMapAnimating = true; // Suspend map view updates while setting UI
+                    isMapAnimating = true; 
                     syncCoords('dd');
                     isMapAnimating = tempAnim;
                 }
@@ -1926,7 +1913,7 @@
                 pContent.classList.add('hidden'); oContent.classList.remove('hidden');
                 document.getElementById('name-label').innerText = 'Overlay Map Name';
                 
-                removeAllWarpMarkers(); // Aggressive clean up on panel switch
+                removeAllWarpMarkers(); 
                 resetDeletePointMode();
 
                 if (editId) {
@@ -1942,7 +1929,6 @@
                     document.getElementById('panel-title').innerText = 'New Image Overlay';
                     delBtn.classList.add('hidden');
                     
-                    // ONLY clear memory references when starting a NEW overlay map
                     warpPoints = [];
                     currentWarpStep = 'img';
 
@@ -1950,7 +1936,6 @@
                     syncOpacitySlider();
                 }
 
-                // Restore dynamic advanced mode UI settings based on state
                 updateAdvancedWarpLayout();
             }
         }
@@ -1998,7 +1983,7 @@
                 });
             };
             reader.readAsDataURL(file);
-            e.target.value = ''; // Reset file selector so same image can trigger crop sequence again
+            e.target.value = ''; 
         });
 
         function closeCropModal() {
@@ -2029,7 +2014,6 @@
             calImgObj.onload = () => {
                 const isNew = !document.getElementById('edit-item-id').value;
 
-                // Load image into warp workspace map immediately
                 document.getElementById('warp-image-placeholder').classList.add('hidden');
                 if (warpImageLayer) warpImageMap.removeLayer(warpImageLayer);
                 
@@ -2044,7 +2028,6 @@
                         imgWidthLng = 0; 
                         isPlacingOverlay = true;
                         
-                        // Temporarily hide the panel to give a full view for placement
                         document.getElementById('bottom-panel').classList.replace('panel-open', 'panel-closed');
                         document.getElementById('map').classList.remove('map-squeezed');
                         document.getElementById('ui-layer').classList.remove('map-squeezed');
@@ -2066,7 +2049,6 @@
                         updateOpacitySliderVisibility();
                     }
                 } else {
-                    // Warp mode: Clear points as image has changed
                     clearWarpPoints();
                 }
             };
@@ -2125,7 +2107,6 @@
             overlayMode = overlayMode === 'standard' ? 'warp' : 'standard';
             resetDeletePointMode();
             
-            // Re-render and configure active layers cleanly
             if (overlayMode === 'standard') {
                 removeRubberSheetOverlay();
                 if (activeOverlayBlobUrl && imgCenter) {
@@ -2169,7 +2150,7 @@
                 stdBlock.classList.add('hidden');
                 advBlock.classList.remove('hidden');
 
-                bPanel.style.height = ''; // Ensure standard height
+                bPanel.style.height = ''; 
                 mapContainer.classList.add('map-squeezed');
                 uiLayer.classList.add('map-squeezed');
 
@@ -2181,7 +2162,6 @@
                     }
                 }, 300);
 
-                // Render dynamic control points if editable
                 rebuildWarpMarkersOnMap();
 
             } else {
@@ -2209,7 +2189,6 @@
             removeAllWarpMarkers();
 
             warpPoints.forEach((pt, index) => {
-                // Add Image map marker
                 const imgIcon = L.divIcon({
                     className: 'custom-div-icon',
                     html: `<div class='img-marker-icon' style='width:22px; height:22px;'>${index + 1}</div>`,
@@ -2228,7 +2207,6 @@
                 
                 imgMarkers.push(imgMkr);
 
-                // Add main map marker
                 if (pt.map) {
                     const mapIcon = L.divIcon({
                         className: 'custom-div-icon',
@@ -2248,7 +2226,6 @@
                 }
             });
 
-            // Ensure current step matches data (e.g. if a dangling point remains)
             if (warpPoints.length > 0 && warpPoints[warpPoints.length - 1].map === null) {
                 currentWarpStep = 'map';
             } else {
@@ -2261,7 +2238,6 @@
         function renderRubberSheetOverlay() {
             if (!activeOverlayBlobUrl || warpPoints.length < 3) return;
             
-            // Extract valid points that have both image and map coordinates
             const validPts = warpPoints.filter(p => p.map !== null);
             if (validPts.length < 3) return;
 
@@ -2296,7 +2272,7 @@
                 if (reqId) { cancelAnimationFrame(reqId); reqId = null; }
             };
             btn.addEventListener('mousedown', start); btn.addEventListener('mouseup', stop); btn.addEventListener('mouseleave', stop);
-            btn.addEventListener('touchstart', start, {passive: false}); btn.addEventListener('touchcancel', stop, {passive: false}); btn.addEventListener('touchcancel', stop, {passive: false});
+            btn.addEventListener('touchstart', start, {passive: false}); btn.addEventListener('touchcancel', stop, {passive: false});
         }
 
         function setupOverlayHoldControls() {
@@ -2346,7 +2322,6 @@
         async function saveOverlay() {
             if (!activeOverlayImgBlob) { showAlert("Missing Image", "Please choose an image file for this overlay."); return; }
             
-            // Require at least 3 control points to save in warp mode
             if (overlayMode === 'warp' && warpPoints.filter(p => p.map !== null).length < 3) {
                 showAlert("Warp Points Needed", "Warping requires at least 3 completed control points mapping the image to the layout map.");
                 return;
@@ -2364,7 +2339,6 @@
                 return;
             }
 
-            // Standard calibration configuration
             const calibration = {
                 lat: imgCenter ? imgCenter.lat : map.getCenter().lat,
                 lng: imgCenter ? imgCenter.lng : map.getCenter().lng,
@@ -2378,9 +2352,9 @@
                 id, name, 
                 imageBuffer: imageBuffer,
                 imageType: activeOverlayImgBlob.type,
-                mode: overlayMode, // 'standard' or 'warp'
+                mode: overlayMode, 
                 calibration: calibration,
-                warpPoints: overlayMode === 'warp' ? warpPoints : [], // Serialize warp control points
+                warpPoints: overlayMode === 'warp' ? warpPoints : [], 
                 savedView: {
                     lat: map.getCenter().lat,
                     lng: map.getCenter().lng,
@@ -2437,7 +2411,6 @@
                 activeOverlayImgBlob = blob;
                 activeOverlayBlobUrl = URL.createObjectURL(blob);
 
-                // Load parameters
                 imgCenter = L.latLng(data.calibration.lat, data.calibration.lng);
                 imgWidthLng = data.calibration.width;
                 imgHeightLat = data.calibration.height;
@@ -2449,7 +2422,6 @@
                 calImgObj = new Image();
                 calImgObj.src = activeOverlayBlobUrl;
                 calImgObj.onload = () => {
-                    // Populate warp workspace image map
                     document.getElementById('warp-image-placeholder').classList.add('hidden');
                     if (warpImageLayer) warpImageMap.removeLayer(warpImageLayer);
                     const bounds = [[-calImgObj.naturalHeight, 0], [0, calImgObj.naturalWidth]]; 
@@ -2465,7 +2437,6 @@
 
                 syncOpacitySlider();
                 
-                // Re-center map back to saved perspective if available
                 if (data.savedView) {
                     let targetZoom = data.savedView.zoom;
                     const currentIsOS = (currentMapType === 'os_combined');
@@ -2496,7 +2467,6 @@
                 const data = await idbKeyval.get(id);
                 if (!data) return;
                 
-                // Switch focus map view back to saved perspective coordinates
                 if (data.savedView) {
                     let targetZoom = data.savedView.zoom;
                     const currentIsOS = (currentMapType === 'os_combined');
@@ -2672,7 +2642,7 @@
                     isVisible: true
                 };
                 newM.leafletMarker = createLeafletMarker(newM);
-                markers.unshift(newM); // Add to the top of the array
+                markers.unshift(newM); 
             }
 
             saveMarkersToStorage(); 
@@ -2683,15 +2653,14 @@
         function toggleAllPointsVisibility() {
             if (markers.length === 0) return;
             
-            // Filter out the active navigation marker to determine the state of the OTHERS
             const nonNavMarkers = markers.filter(m => m.id !== navigatingToId);
-            if (nonNavMarkers.length === 0) return; // Nothing to toggle if the only point is the nav target
+            if (nonNavMarkers.length === 0) return; 
             
             const hasVisibleOthers = nonNavMarkers.some(m => m.isVisible);
             const targetVisibility = !hasVisibleOthers;
             
             markers.forEach(m => {
-                if (navigatingToId === m.id) return; // Skip the active navigation marker completely
+                if (navigatingToId === m.id) return; 
                 
                 m.isVisible = targetVisibility;
                 if (m.isVisible) {
@@ -2724,6 +2693,39 @@
                 btnIcon.setAttribute('data-lucide', hasVisible ? 'eye-off' : 'eye');
                 lucide.createIcons();
             }
+        }
+
+        function saveMarkersToStorage() {
+            const dataToSave = markers.map(m => ({
+                id: m.id, name: m.name, lat: m.lat, lng: m.lng, isVisible: m.isVisible
+            }));
+            localStorage.setItem('maverish_markers', JSON.stringify(dataToSave));
+        }
+
+        function loadMarkersFromStorage() {
+            const savedData = localStorage.getItem('maverish_markers');
+            if (savedData) {
+                try {
+                    const parsedMarkers = JSON.parse(savedData);
+                    parsedMarkers.forEach(m => {
+                        const newM = { ...m };
+                        newM.leafletMarker = createLeafletMarker(newM);
+                        markers.push(newM);
+                    });
+                    renderMarkerList();
+                } catch (e) { console.error("Failed to load markers", e); }
+            }
+        }
+
+        function toggleMarkerVisibility(id) {
+            if (navigatingToId === id) return; 
+            const m = markers.find(x => x.id === id);
+            if (!m) return;
+            m.isVisible = !m.isVisible;
+            if (m.isVisible) m.leafletMarker.addTo(map);
+            else map.removeLayer(m.leafletMarker);
+            saveMarkersToStorage(); 
+            renderMarkerList();
         }
 
         // --- GPS Tracking & Heading Compass ---
@@ -2818,38 +2820,29 @@
             }
         }
 
-        function getScreenOrientationAngle() {
-            if (window.screen && window.screen.orientation && typeof window.screen.orientation.angle === 'number') {
-                return window.screen.orientation.angle;
-            } else if (typeof window.orientation === 'number') {
-                return window.orientation;
-            }
-            return 0;
-        }
-
         function requestOrientationPermission() {
             if (orientationRequested) return;
             orientationRequested = true;
             
-            const handleCompass = (e) => {
-                handleOrientation(e);
-            };
+            const isIOS = (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') ||
+                          (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream);
 
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                // iOS 13+ Setup with explicit user consent prompt requirement
-                DeviceOrientationEvent.requestPermission()
-                    .then(response => {
-                        if (response == 'granted') {
-                            window.addEventListener('deviceorientation', handleCompass, true);
-                        }
-                    }).catch(console.error);
-            } else {
-                // Non-iOS devices (Android)
-                // Use absolute event if natively supported to prevent local-reference relative alpha values
-                if ('ondeviceorientationabsolute' in window) {
-                    window.addEventListener('deviceorientationabsolute', handleCompass, true);
+            if (isIOS) {
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    DeviceOrientationEvent.requestPermission()
+                        .then(response => {
+                            if (response === 'granted') {
+                                window.addEventListener('deviceorientation', handleOrientation, true);
+                            }
+                        }).catch(console.error);
                 } else {
-                    window.addEventListener('deviceorientation', handleCompass, true);
+                    window.addEventListener('deviceorientation', handleOrientation, true);
+                }
+            } else {
+                if ('ondeviceorientationabsolute' in window) {
+                    window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+                } else {
+                    window.addEventListener('deviceorientation', handleOrientation, true);
                 }
             }
         }
@@ -2857,18 +2850,23 @@
         function handleOrientation(event) {
             let heading = null;
             
-            // Extract uncompensated heading from the magnetometer stream
-            if (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) {
-                heading = event.webkitCompassHeading;
-            } else if (event.alpha !== null && event.alpha !== undefined) {
-                // Normalize 360-alpha orientation clockwise direction
-                heading = (360 - event.alpha) % 360;
+            // Adjust for screen rotation/landscape alignment offsets
+            let rotation = 0;
+            if (window.screen && window.screen.orientation && typeof window.screen.orientation.angle === 'number') {
+                rotation = window.screen.orientation.angle;
+            } else if (typeof window.orientation === 'number') {
+                rotation = window.orientation;
+            }
+            rotation = (rotation + 360) % 360;
+
+            if (typeof event.webkitCompassHeading !== 'undefined' && event.webkitCompassHeading !== null) {
+                heading = (event.webkitCompassHeading + rotation) % 360;
+            } else if (event.alpha !== null && (event.absolute === true || event.type === 'deviceorientationabsolute')) {
+                heading = (360 - event.alpha + rotation) % 360;
             }
             
-            if (heading !== null && !isNaN(heading)) {
-                // Compensate for viewport rotation (landscape vs portrait shift)
-                const screenAngle = getScreenOrientationAngle();
-                deviceHeading = (heading - screenAngle + 360) % 360;
+            if (heading !== null) {
+                deviceHeading = heading;
                 updateHeadingUI();
             }
         }
@@ -2878,7 +2876,9 @@
             if (headingContainer && deviceHeading !== null && !isNaN(deviceHeading)) {
                 headingContainer.style.display = 'block';
                 
-                let delta = deviceHeading - (currentMarkerRotation % 360);
+                let deviceNorm = (deviceHeading % 360 + 360) % 360;
+                let currentNorm = (currentMarkerRotation % 360 + 360) % 360;
+                let delta = deviceNorm - currentNorm;
                 if (delta > 180) delta -= 360;
                 if (delta < -180) delta += 360;
                 currentMarkerRotation += delta;
@@ -3148,8 +3148,10 @@
                 dialRotation = -userPos.heading;
             }
             
-            // Shortest rotational path calculations
-            let deltaTarget = targetRotation - (currentNavRotation % 360);
+            // Shortest rotational path calculations (double-modulo to handle wraparounds flawlessly)
+            let targetNorm = (targetRotation % 360 + 360) % 360;
+            let currentNorm = (currentNavRotation % 360 + 360) % 360;
+            let deltaTarget = targetNorm - currentNorm;
             if (deltaTarget > 180) deltaTarget -= 360;
             if (deltaTarget < -180) deltaTarget += 360;
             currentNavRotation += deltaTarget;
@@ -3158,7 +3160,9 @@
             if (largeCompContainer) largeCompContainer.style.transform = `rotate(${currentNavRotation}deg)`;
             
             if (dialContainer) {
-                let deltaDial = dialRotation - (currentDialRotation % 360);
+                let dialNorm = (dialRotation % 360 + 360) % 360;
+                let currentDialNorm = (currentDialRotation % 360 + 360) % 360;
+                let deltaDial = dialNorm - currentDialNorm;
                 if (deltaDial > 180) deltaDial -= 360;
                 if (deltaDial < -180) deltaDial += 360;
                 currentDialRotation += deltaDial;
@@ -3199,7 +3203,6 @@
             setColorPickerValue('marker', globalMarkerColor, true);
             setColorPickerValue('nav', globalNavColor, true);
 
-            // Ensure custom panels are folded back down when opened
             ['marker', 'nav'].forEach(prefix => {
                 const panel = document.getElementById(`custom-panel-${prefix}`);
                 const text = document.getElementById(`toggle-text-${prefix}`);
@@ -3230,7 +3233,6 @@
             
             applyDarkMode();
             
-            // Swap layer cleanly if the user is currently looking at the OS map
             if (osSettingsChanged && currentMapType === 'os_combined') {
                 if (currentBaseLayer && map.hasLayer(currentBaseLayer)) {
                     map.removeLayer(currentBaseLayer);
@@ -3238,7 +3240,6 @@
                 currentBaseLayer = getOSLayerGroup();
                 currentBaseLayer.addTo(map);
                 
-                // Preserve stacking order natively
                 if (leafletImageOverlay && typeof leafletImageOverlay.bringToFront === 'function') leafletImageOverlay.bringToFront();
                 if (leafletRubberSheetOverlay && typeof leafletRubberSheetOverlay.bringToFront === 'function') leafletRubberSheetOverlay.bringToFront();
                 if (navPolyline && typeof navPolyline.bringToFront === 'function') navPolyline.bringToFront();
@@ -3248,39 +3249,6 @@
             saveMapState();
             markers.forEach(m => { if (m.leafletMarker) m.leafletMarker.setIcon(getCustomIcon()); });
             closeModals();
-            renderMarkerList();
-        }
-
-        function saveMarkersToStorage() {
-            const dataToSave = markers.map(m => ({
-                id: m.id, name: m.name, lat: m.lat, lng: m.lng, isVisible: m.isVisible
-            }));
-            localStorage.setItem('maverish_markers', JSON.stringify(dataToSave));
-        }
-
-        function loadMarkersFromStorage() {
-            const savedData = localStorage.getItem('maverish_markers');
-            if (savedData) {
-                try {
-                    const parsedMarkers = JSON.parse(savedData);
-                    parsedMarkers.forEach(m => {
-                        const newM = { ...m };
-                        newM.leafletMarker = createLeafletMarker(newM);
-                        markers.push(newM);
-                    });
-                    renderMarkerList();
-                } catch (e) { console.error("Failed to load markers", e); }
-            }
-        }
-
-        function toggleMarkerVisibility(id) {
-            if (navigatingToId === id) return; 
-            const m = markers.find(x => x.id === id);
-            if (!m) return;
-            m.isVisible = !m.isVisible;
-            if (m.isVisible) m.leafletMarker.addTo(map);
-            else map.removeLayer(m.leafletMarker);
-            saveMarkersToStorage(); 
             renderMarkerList();
         }
 
@@ -3339,17 +3307,14 @@
                     .then(reg => {
                         console.log('ServiceWorker registered');
 
-                        // 1. Check if an updated worker is already waiting (e.g. user refreshed but didn't update yet)
                         if (reg.waiting) {
                             showUpdateToast(reg.waiting);
                         }
 
-                        // 2. Listen for future updates installing in the background
                         reg.addEventListener('updatefound', () => {
                             const newWorker = reg.installing;
                             newWorker.addEventListener('statechange', () => {
                                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    // The update has safely finished pre-caching in the background
                                     showUpdateToast(newWorker);
                                 }
                             });
@@ -3357,7 +3322,6 @@
                     })
                     .catch(err => console.log('ServiceWorker failed: ', err));
 
-                // 3. Automatically reload the tab once the new Service Worker gains active control
                 let refreshing = false;
                 navigator.serviceWorker.addEventListener('controllerchange', () => {
                     if (!refreshing) {
@@ -3367,21 +3331,17 @@
                 });
             }
 
-            // Helper function to expose the toast and attach click action
             function showUpdateToast(worker) {
                 const toast = document.getElementById('pwa-update-toast');
                 const btn = document.getElementById('pwa-update-btn');
                 if (!toast || !btn) return;
 
-                // Make toast visible
                 toast.classList.remove('hidden');
                 
-                // Re-initialize Lucide icons in case the node icon needs initialization
                 if (window.lucide) {
                     window.lucide.createIcons();
                 }
 
-                // On user confirmation, pass the skip waiting command
                 btn.onclick = () => {
                     worker.postMessage({ type: 'SKIP_WAITING' });
                 };
