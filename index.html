@@ -27,7 +27,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <!-- OS Branding -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/OrdnanceSurvey/os-api-branding@latest/os-api-branding.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.gh/gh/OrdnanceSurvey/os-api-branding@latest/os-api-branding.css" />
     
     <!-- Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -1058,7 +1058,7 @@
             });
 
             const customSwatch = document.getElementById(`custom-swatch-${prefix}`);
-            const customIcon = document.getElementById(`custom-icon-${prefix}`);
+            const customIcon = document.getElementById('custom-icon-' + prefix);
             
             if (!isQuickColor) {
                 customSwatch.style.backgroundColor = hex;
@@ -2272,7 +2272,9 @@
                 if (reqId) { cancelAnimationFrame(reqId); reqId = null; }
             };
             btn.addEventListener('mousedown', start); btn.addEventListener('mouseup', stop); btn.addEventListener('mouseleave', stop);
-            btn.addEventListener('touchstart', start, {passive: false}); btn.addEventListener('touchcancel', stop, {passive: false});
+            btn.addEventListener('touchstart', start, {passive: false}); 
+            btn.addEventListener('touchend', stop, {passive: false}); 
+            btn.addEventListener('touchcancel', stop, {passive: false});
         }
 
         function setupOverlayHoldControls() {
@@ -3088,7 +3090,7 @@
                 
                 if (source !== 'map' && isBottomPanelOpen) {
                     if (!isMapAnimating) map.setView([lat, lng]);
-                    document.getElementById('picked-coords-display').innerText = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                    document.getElementById('picked-coords-display').innerText = `${lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
                     tempPickedCoords = {lat, lng};
                 }
             } catch (err) {}
