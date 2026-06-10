@@ -35,9 +35,6 @@
     <!-- idb-keyval for lightweight IndexedDB access -->
     <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
 
-    <!-- Delaunator (for generating the triangle mesh) -->
-    <script src="https://unpkg.com/delaunator@5.0.0/delaunator.js"></script>
-
     <!-- Cropper.js CSS & JS for Image Pre-processing -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
@@ -755,8 +752,101 @@
             return [a, b, c, d, e, f];
         }
 
-        function getTriangleArea(p1, p2, p3) {
-            return Math.abs((p1.x*(p2.y-p3.y) + p2.x*(p3.y-p1.y) + p3.x*(p1.y-p2.y))/2);
+        function solveLinearSystem(A, b) {
+            const n = A.length;
+            for (let i = 0; i < n; i++) {
+                let maxRow = i;
+                for (let k = i + 1; k < n; k++) {
+                    if (Math.abs(A[k][i]) > Math.abs(A[maxRow][i])) maxRow = k;
+                }
+                const tempA = A[i]; A[i] = A[maxRow]; A[maxRow] = tempA;
+                const tempB = b[i]; b[i] = b[maxRow]; b[maxRow] = tempB;
+                
+                const diag = A[i][i];
+                if (Math.abs(diag) < 1e-10) return null; // Singular matrix
+                for (let j = i; j < n; j++) A[i][j] /= diag;
+                b[i] /= diag;
+                
+                for (let k = 0; k < n; k++) {
+                    if (k === i) continue;
+                    const factor = A[k][i];
+                    for (let j = i; j < n; j++) A[k][j] -= factor * A[i][j];
+                    b[k] -= factor * b[i];
+                }
+            }
+            return b;
+        }
+
+        class ThinPlateSpline {
+            constructor(srcPts, dstPts) {
+                this.srcPts = srcPts;
+                this.N = srcPts.length;
+                
+                const K = [];
+                for(let i=0; i<this.N; i++) {
+                    K[i] = [];
+                    for(let j=0; j<this.N; j++) {
+                        K[i][j] = this.U(this.dist(srcPts[i], srcPts[j]));
+                    }
+                }
+                
+                const L = [];
+                for(let i=0; i<this.N + 3; i++) {
+                    L[i] = new Array(this.N + 3).fill(0);
+                    if (i < this.N) {
+                        for(let j=0; j<this.N; j++) L[i][j] = K[i][j];
+                        L[i][this.N] = 1;
+                        L[i][this.N+1] = srcPts[i].x;
+                        L[i][this.N+2] = srcPts[i].y;
+                    } else {
+                        const col = i - this.N;
+                        for(let j=0; j<this.N; j++) {
+                            if (col === 0) L[i][j] = 1;
+                            if (col === 1) L[i][j] = srcPts[j].x;
+                            if (col === 2) L[i][j] = srcPts[j].y;
+                        }
+                    }
+                }
+                
+                const bx = [], by = [];
+                for(let i=0; i<this.N + 3; i++) {
+                    bx[i] = i < this.N ? dstPts[i].x : 0;
+                    by[i] = i < this.N ? dstPts[i].y : 0;
+                }
+                
+                // Solve vectors using deep copies so original matrix isn't corrupted
+                const Lx = L.map(row => [...row]);
+                const Ly = L.map(row => [...row]);
+                
+                this.wx = solveLinearSystem(Lx, bx);
+                this.wy = solveLinearSystem(Ly, by);
+            }
+            
+            U(r) {
+                if (r === 0) return 0;
+                let r2 = r*r;
+                return r2 * Math.log(r2);
+            }
+            
+            dist(p1, p2) {
+                let dx = p1.x - p2.x;
+                let dy = p1.y - p2.y;
+                return Math.sqrt(dx*dx + dy*dy);
+            }
+            
+            transform(x, y) {
+                if (!this.wx || !this.wy) return {x: x, y: y};
+                let ux = this.wx[this.N] + this.wx[this.N+1]*x + this.wx[this.N+2]*y;
+                let uy = this.wy[this.N] + this.wy[this.N+1]*x + this.wy[this.N+2]*y;
+                
+                for(let i=0; i<this.N; i++) {
+                    let r = this.dist({x,y}, this.srcPts[i]);
+                    let u = this.U(r);
+                    ux += this.wx[i] * u;
+                    uy += this.wy[i] * u;
+                }
+                return {x: ux, y: uy};
+            }
         }
 
         // --- Custom Rubbersheet Overlay Layer ---
@@ -784,54 +874,68 @@
                 if (this._canvas) this._canvas.style.opacity = opacity;
             },
             _buildMesh: function() {
-                this._allPts = [...this._userPts];
-                const mapZoom = 0;
-                let maxArea = -1, bestSet = null;
-
-                if (this._userPts.length >= 3) {
-                    for(let i=0; i<this._userPts.length-2; i++) {
-                        for(let j=i+1; j<this._userPts.length-1; j++) {
-                            for(let k=j+1; k<this._userPts.length; k++) {
-                                let area = getTriangleArea(this._userPts[i].img, this._userPts[j].img, this._userPts[k].img);
-                                if (area > maxArea) { maxArea = area; bestSet = [this._userPts[i], this._userPts[j], this._userPts[k]]; }
-                            }
-                        }
-                    }
-                }
-
-                if (bestSet && maxArea > 10) {
-                    const src3 = bestSet.map(p => p.img);
-                    const dst3 = bestSet.map(p => this._map.project(p.map, mapZoom));
-                    const M = getAffineTransform(src3, dst3);
-                    if (M) {
-                        const w = this._img.naturalWidth, h = this._img.naturalHeight;
-                        [{x:0,y:0}, {x:w,y:0}, {x:w,y:h}, {x:0,y:h}].forEach(c => {
-                            let px = M[0]*c.x + M[2]*c.y + M[4];
-                            let py = M[1]*c.x + M[3]*c.y + M[5];
-                            this._allPts.push({ img: c, map: this._map.unproject(L.point(px, py), mapZoom) });
-                        });
-                    }
-                }
-
-                const coords = [];
-                this._allPts.forEach(p => coords.push(p.img.x, p.img.y));
-                const delaunay = new Delaunator(coords);
-                
                 this._triangles = [];
-                for (let i = 0; i < delaunay.triangles.length; i += 3) {
-                    this._triangles.push([
-                        this._allPts[delaunay.triangles[i]],
-                        this._allPts[delaunay.triangles[i+1]],
-                        this._allPts[delaunay.triangles[i+2]]
-                    ]);
+                const mapZoom = 0;
+
+                if (this._userPts.length < 3) return;
+
+                const srcPts = this._userPts.map(p => p.img);
+                const dstPts = this._userPts.map(p => this._map.project(p.map, mapZoom));
+
+                const tps = new ThinPlateSpline(srcPts, dstPts);
+
+                // Create a dense 20x20 uniform grid to map the TPS surface
+                const cols = 20;
+                const rows = 20;
+                const w = this._img.naturalWidth;
+                const h = this._img.naturalHeight;
+
+                const grid = [];
+                for (let i = 0; i <= rows; i++) {
+                    grid[i] = [];
+                    for (let j = 0; j <= cols; j++) {
+                        const imgX = (j / cols) * w;
+                        const imgY = (i / rows) * h;
+                        
+                        const mapPt = tps.transform(imgX, imgY);
+                        
+                        grid[i][j] = {
+                            img: { x: imgX, y: imgY },
+                            map: this._map.unproject(L.point(mapPt.x, mapPt.y), mapZoom)
+                        };
+                    }
+                }
+
+                // Generate two triangles per grid cell
+                for (let i = 0; i < rows; i++) {
+                    for (let j = 0; j < cols; j++) {
+                        const p1 = grid[i][j];
+                        const p2 = grid[i][j+1];
+                        const p3 = grid[i+1][j];
+                        const p4 = grid[i+1][j+1];
+
+                        this._triangles.push([p1, p2, p3]);
+                        this._triangles.push([p2, p4, p3]);
+                    }
                 }
             },
             _redraw: function () {
-                if (!this._map || this._allPts.length === 0) return;
-                const bounds = L.bounds(this._allPts.map(p => this._map.latLngToLayerPoint(p.map)));
+                if (!this._map || this._triangles.length === 0) return;
+                
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                this._triangles.forEach(tri => {
+                    tri.forEach(pt => {
+                        const lp = this._map.latLngToLayerPoint(pt.map);
+                        if (lp.x < minX) minX = lp.x;
+                        if (lp.y < minY) minY = lp.y;
+                        if (lp.x > maxX) maxX = lp.x;
+                        if (lp.y > maxY) maxY = lp.y;
+                    });
+                });
+
                 const padding = 50;
-                const topLeft = bounds.min.subtract([padding, padding]);
-                const size = bounds.getSize().add([padding*2, padding*2]);
+                const topLeft = L.point(minX - padding, minY - padding);
+                const size = L.point(maxX - minX + padding * 2, maxY - minY + padding * 2);
 
                 L.DomUtil.setPosition(this._canvas, topLeft);
                 
