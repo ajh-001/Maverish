@@ -27,7 +27,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <!-- OS Branding -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.gh/gh/OrdnanceSurvey/os-api-branding@latest/os-api-branding.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/OrdnanceSurvey/os-api-branding@latest/os-api-branding.css" />
     
     <!-- Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -218,16 +218,16 @@
             </button>
         </div>
 
-        <!-- Top Navigation Bar -->
-        <div id="nav-bar" class="bg-gray-700 text-white shadow-lg p-3 flex items-center justify-between transform -translate-y-full transition-transform duration-300 pointer-events-auto relative z-10">
+        <!-- Top Navigation Bar (Adaptive Mode) -->
+        <div id="nav-bar" class="bg-white dark:bg-gray-800 text-gray-800 dark:text-white border-b border-gray-200 dark:border-gray-700 shadow-lg p-3 flex items-center justify-between transform -translate-y-full transition-all duration-300 pointer-events-auto relative z-10">
             <div class="flex items-center space-x-3">
-                <button onclick="openCompassModal()" class="bg-gray-900 w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-800 transition-colors cursor-pointer shrink-0">
-                    <div id="nav-compass-container" class="nav-compass-container-class transition-transform duration-200 ease-out w-5 h-5 text-blue-400">
+                <button onclick="openCompassModal()" class="bg-gray-100 dark:bg-gray-900 hover:bg-gray-200 dark:hover:bg-gray-700 w-10 h-10 flex items-center justify-center rounded-full transition-colors cursor-pointer shrink-0">
+                    <div id="nav-compass-container" class="nav-compass-container-class transition-transform duration-200 ease-out w-5 h-5 text-blue-500 dark:text-blue-400">
                         <svg viewBox="0 0 24 24" class="w-full h-full fill-current drop-shadow-sm" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2" /></svg>
                     </div>
                 </button>
                 <div>
-                    <h2 class="text-xs font-semibold opacity-80 uppercase tracking-wider">Navigating to</h2>
+                    <h2 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Navigating to</h2>
                     <p id="nav-target-name" class="text-base font-bold">Target Point</p>
                     <p id="nav-distance" class="text-xs font-medium tracking-wide">-- m</p>
                 </div>
@@ -662,24 +662,24 @@
             <button onclick="closeModals()" class="px-4 py-2 bg-blue-600 text-white text-sm hover:bg-blue-700 rounded-lg font-medium shadow-md transition w-full">OK</button>
         </div>
 
-        <!-- Large Compass Modal -->
-        <div id="compass-modal" class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col items-center justify-center p-8 border border-gray-700 text-center mx-auto">
-            <h3 class="text-lg font-bold text-gray-100 mb-6 flex items-center justify-center gap-2 w-full">
+        <!-- Large Compass Modal (Adaptive dark/light mode supported) -->
+        <div id="compass-modal" class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm hidden pointer-events-auto flex-col items-center justify-center p-8 border border-gray-200 dark:border-gray-700 text-center mx-auto">
+            <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center justify-center gap-2 w-full">
                 <i data-lucide="navigation-2" class="w-5 h-5 text-blue-400"></i>
                 <span id="compass-modal-title">Heading</span>
             </h3>
-            <div class="relative w-56 h-56 mx-auto rounded-full border-4 border-gray-700 flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,0.5),0_0_30px_rgba(0,0,0,0.3)] bg-gray-900 shrink-0">
+            <div class="relative w-56 h-56 mx-auto rounded-full border-4 border-gray-200 dark:border-gray-700 flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,0.15),0_0_30px_rgba(0,0,0,0.1)] dark:shadow-[inset_0_0_20px_rgba(0,0,0,0.5),0_0_30px_rgba(0,0,0,0.3)] bg-gray-50 dark:bg-gray-900 shrink-0">
                 
                 <!-- Fixed dot just above the compass for alignment -->
-                <div class="absolute -top-4 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gray-100 border-[3px] border-gray-800 rounded-full z-30 shadow-sm"></div>
+                <div class="absolute -top-4 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gray-100 dark:bg-gray-200 border-[3px] border-gray-300 dark:border-gray-800 rounded-full z-30 shadow-sm"></div>
 
                 <div id="large-compass-dial" class="large-compass-dial-class absolute inset-0 transition-transform duration-200 ease-out pointer-events-none rounded-full overflow-hidden">
                     <div id="compass-ticks-container" class="absolute inset-0"></div>
                     <div class="absolute top-2 left-1/2 transform -translate-x-1/2 text-red-500 font-bold text-base leading-none z-10">N</div>
-                    <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-base leading-none z-10">E</div>
-                    <div class="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-gray-500 font-bold text-base leading-none z-10">S</div>
-                    <div class="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-base leading-none z-10">W</div>
-                    <div class="absolute inset-7 rounded-full border border-gray-700 pointer-events-none opacity-50"></div>
+                    <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 font-bold text-base leading-none z-10">E</div>
+                    <div class="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-gray-400 dark:text-gray-500 font-bold text-base leading-none z-10">S</div>
+                    <div class="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 font-bold text-base leading-none z-10">W</div>
+                    <div class="absolute inset-7 rounded-full border border-gray-300 dark:border-gray-700 pointer-events-none opacity-50"></div>
                 </div>
                 <div id="large-compass-container" class="nav-compass-container-class absolute inset-0 transition-transform duration-200 ease-out z-10">
                     <!-- Dot aligned with the arrow -->
@@ -692,10 +692,10 @@
                 </div>
             </div>
             <div class="mt-6 mb-8 w-full text-center">
-                <p class="text-xs text-gray-400 uppercase tracking-widest font-semibold mb-1">Distance</p>
-                <p id="large-compass-distance" class="text-3xl font-mono font-bold text-white tracking-tight">-- m</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-widest font-semibold mb-1">Distance</p>
+                <p id="large-compass-distance" class="text-3xl font-mono font-bold text-gray-900 dark:text-white tracking-tight">-- m</p>
             </div>
-            <button onclick="closeModals()" class="px-6 py-2 bg-gray-700 text-white text-sm hover:bg-gray-600 rounded-xl font-medium shadow-md transition w-full">Close</button>
+            <button onclick="closeModals()" class="px-6 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-white rounded-xl font-medium shadow-md border border-gray-200 dark:border-transparent transition w-full">Close</button>
         </div>
 
         <!-- Pre-Processing Modal (Crop & Rotate) -->
@@ -2247,6 +2247,7 @@
             leafletRubberSheetOverlay.addTo(map);
         }
 
+        // Remove the overlay cleanly
         function removeRubberSheetOverlay() {
             if (leafletRubberSheetOverlay) {
                 map.removeLayer(leafletRubberSheetOverlay);
@@ -2742,7 +2743,7 @@
                 wrapper.className = 'absolute inset-0 flex justify-center';
                 wrapper.style.transform = `rotate(${i}deg)`;
                 const tick = document.createElement('div');
-                tick.className = `rounded-full mt-1 ${isLarge ? 'bg-gray-400' : 'bg-gray-600'}`;
+                tick.className = `rounded-full mt-1 ${isLarge ? 'bg-gray-400 dark:bg-gray-500' : 'bg-gray-300 dark:bg-gray-600'}`;
                 tick.style.width = isLarge ? '3px' : '1px';
                 tick.style.height = isLarge ? '12px' : '6px';
                 wrapper.appendChild(tick);
