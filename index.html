@@ -84,9 +84,6 @@
         /* Map Squeeze Class */
         .map-squeezed { bottom: 380px !important; }
         
-        /* Crosshair Cursor for Placement */
-        .map-placing-overlay, .map-placing-overlay .leaflet-interactive { cursor: crosshair !important; }
-
         /* Custom User Location Marker from draft.html */
         .user-location-marker {
             background-color: #3b82f6;
@@ -213,14 +210,6 @@
             </svg>
         </div>
         
-        <!-- Map Instruction Banner for Image Placement -->
-        <div id="map-instruction-overlay" class="hidden absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white pl-6 pr-2 py-2 rounded-full shadow-lg z-[1000] font-bold pointer-events-auto flex items-center justify-between gap-4 w-11/12 max-w-md transition-opacity">
-            <span id="instruction-overlay-text" class="text-sm">Click map to place image center.</span>
-            <button onclick="cancelOverlayPlacement()" class="bg-blue-800 hover:bg-blue-900 rounded-full p-1.5 transition-colors">
-                <i data-lucide="x" class="w-4 h-4"></i>
-            </button>
-        </div>
-
         <!-- Top Navigation Bar (Adaptive Mode) -->
         <div id="nav-bar" class="bg-white dark:bg-gray-800 text-gray-800 dark:text-white border-b border-gray-200 dark:border-gray-700 shadow-lg p-3 flex items-center justify-between transform -translate-y-full transition-all duration-300 pointer-events-auto relative z-10">
             <div class="flex items-center space-x-3">
@@ -271,6 +260,7 @@
 
     <!-- Unified Bottom Panel (Points & Overlays) -->
     <div id="bottom-panel" class="fixed bottom-0 left-0 right-0 h-[380px] bg-white dark:bg-gray-800 shadow-[0_-10px_30px_rgba(0,0,0,0.15)] dark:shadow-[0_-10px_30px_rgba(0,0,0,0.5)] z-[35] panel-closed transition-transform duration-300 flex flex-col pointer-events-auto">
+        <!-- Panel Header -->
         <div class="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900 shrink-0">
             <h3 id="panel-title" class="text-base font-bold text-gray-800 dark:text-gray-100">Add Item</h3>
             <button onclick="cancelItem()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 transition-colors">
@@ -278,18 +268,14 @@
             </button>
         </div>
         
-        <div class="p-4 overflow-y-auto flex-1 bg-white dark:bg-gray-800 relative">
+        <!-- Panel Main Scrollable Workspace -->
+        <div class="p-3 flex-1 bg-white dark:bg-gray-800 relative flex flex-col min-h-0 overflow-hidden">
             <input type="hidden" id="edit-item-id" value="">
             <input type="hidden" id="edit-item-type" value="point"> <!-- 'point' or 'overlay' -->
-            
-            <div class="mb-4">
-                <label id="name-label" class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Name / Label</label>
-                <input type="text" id="item-name" placeholder="e.g., Summit, Basecamp" class="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
-            </div>
 
             <!-- POINT SPECIFIC CONTENT -->
-            <div id="panel-point-content" class="hidden">
-                <div class="mb-4">
+            <div id="panel-point-content" class="hidden flex-1 flex flex-col space-y-3 overflow-y-auto pr-1">
+                <div>
                     <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Input Method</label>
                     <select id="coord-format" onchange="updateCoordInputs()" class="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-gray-50 dark:bg-gray-700 dark:text-white transition-colors">
                         <option value="map">Map Crosshair</option>
@@ -324,92 +310,59 @@
                 <div id="input-os" class="hidden space-y-3"><div class="flex gap-2"><div class="flex-1"><label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">Easting</label><input type="number" id="os-easting" class="w-full text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded p-2" oninput="syncCoords('os')"></div><div class="flex-1"><label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">Northing</label><input type="number" id="os-northing" class="w-full text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded p-2" oninput="syncCoords('os')"></div></div></div>
             </div>
 
-            <!-- OVERLAY SPECIFIC CONTENT -->
-            <div id="panel-overlay-content" class="hidden">
-                <div class="flex flex-col gap-4">
-                    
-                    <!-- STANDARD CONTROLS (Nudge, Rotate, Scale) -->
-                    <div id="overlay-standard-controls" class="flex flex-col gap-4">
-                        <!-- Fine Controls Grid -->
-                        <div class="grid grid-cols-2 gap-4 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-xl border border-gray-200 dark:border-gray-700">
-                            <!-- D-Pad -->
-                            <div class="flex flex-col items-center">
-                                <div class="grid grid-cols-3 gap-1 w-[120px]">
-                                    <div></div>
-                                    <button id="btn-nudge-up" class="touch-control bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition flex justify-center"><i data-lucide="chevron-up" class="w-5 h-5"></i></button>
-                                    <div></div>
-                                    <button id="btn-nudge-left" class="touch-control bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition flex justify-center"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
-                                    <button id="btn-nudge-down" class="touch-control bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition flex justify-center"><i data-lucide="chevron-down" class="w-5 h-5"></i></button>
-                                    <button id="btn-nudge-right" class="touch-control bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition flex justify-center"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
-                                </div>
-                            </div>
-
-                            <!-- Scale & Rotate -->
-                            <div class="flex flex-col justify-center gap-2">
-                                <div class="flex gap-2">
-                                    <button id="btn-scale-down" class="touch-control flex-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition flex justify-center"><i data-lucide="zoom-out" class="w-5 h-5"></i></button>
-                                    <button id="btn-scale-up" class="touch-control flex-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition flex justify-center"><i data-lucide="zoom-in" class="w-5 h-5"></i></button>
-                                </div>
-                                <div class="flex gap-2">
-                                    <button id="btn-rotate-left" class="touch-control flex-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition flex justify-center"><i data-lucide="rotate-ccw" class="w-5 h-5"></i></button>
-                                    <button id="btn-rotate-right" class="touch-control flex-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition flex justify-center"><i data-lucide="rotate-cw" class="w-5 h-5"></i></button>
-                                </div>
+            <!-- OVERLAY SPECIFIC CONTENT (Takes up full remaining workspace dynamically) -->
+            <div id="panel-overlay-content" class="hidden flex-1 flex flex-col min-h-0">
+                <div id="overlay-advanced-controls" class="flex-grow flex flex-col min-h-0 relative">
+                    <!-- Advanced split-screen workspace container -->
+                    <div class="flex-1 min-h-0 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-900 relative flex flex-col">
+                        <!-- FLOATING CONTROLS BAR on top of image map -->
+                        <div class="absolute top-2 left-2 right-2 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm px-3 py-1.5 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 flex justify-between items-center z-[1000] text-[11px] font-bold text-gray-700 dark:text-gray-300">
+                            <span id="warp-instruction" class="truncate mr-2">Step 1: Tap point on bottom Image</span>
+                            <div class="flex gap-1 shrink-0">
+                                <label class="px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition cursor-pointer flex items-center gap-1">
+                                    <i data-lucide="image" class="w-3.5 h-3.5"></i> <span>Image</span>
+                                    <input type="file" id="overlay-file-input-header" class="hidden" accept="image/*">
+                                </label>
+                                <button type="button" id="btn-delete-point" onclick="toggleDeletePointMode()" class="px-2 py-1 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition flex items-center gap-1">
+                                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> <span>Delete Pt</span>
+                                </button>
+                                <button type="button" onclick="clearWarpPoints()" class="px-2 py-1 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition flex items-center gap-1">
+                                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span>Clear</span>
+                                </button>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- ADVANCED WARP CONTROLS -->
-                    <div id="overlay-advanced-controls" class="hidden flex flex-col gap-3">
-                        <!-- Advanced split-screen workspace container -->
-                        <div class="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-900 flex flex-col h-[280px] shrink-0">
-                            <!-- Instruction Header -->
-                            <div class="bg-gray-100 dark:bg-gray-800 px-3 py-1.5 border-b border-slate-200 dark:border-gray-700 flex justify-between items-center text-[11px] font-bold text-gray-700 dark:text-gray-300 shrink-0">
-                                <span id="warp-instruction">Step 1: Tap point on bottom Image</span>
-                                <div class="flex gap-1">
-                                    <button type="button" id="btn-delete-point" onclick="toggleDeletePointMode()" class="px-2 py-0.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-600 transition">Delete Pt</button>
-                                    <button type="button" onclick="clearWarpPoints()" class="px-2 py-0.5 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded hover:bg-red-100 dark:hover:bg-red-900/50 transition">Clear</button>
-                                </div>
-                            </div>
-                            <!-- Bottom/Image Simple Map Workspace for Points Mapping -->
-                            <div class="flex-1 relative bg-slate-100 dark:bg-slate-900">
-                                <div id="warp-image-map" class="w-full h-full cursor-crosshair"></div>
-                                <div id="warp-image-placeholder" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 text-xs text-center p-4 pointer-events-none">
-                                    <i data-lucide="image" class="w-8 h-8 opacity-40 mb-1"></i>
-                                    <p>Select or upload an image file first to begin control point mapping.</p>
-                                </div>
-                            </div>
+                        
+                        <!-- Bottom/Image Simple Map Workspace for Points Mapping -->
+                        <div class="flex-grow relative bg-slate-100 dark:bg-slate-900 min-h-0">
+                            <div id="warp-image-map" class="w-full h-full cursor-crosshair"></div>
+                            <label id="warp-image-placeholder" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 text-xs text-center p-4 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition pointer-events-auto z-10">
+                                <i data-lucide="image" class="w-8 h-8 opacity-40 mb-1"></i>
+                                <p class="font-bold">Tap here to select an image file to begin.</p>
+                                <input type="file" id="overlay-file-input" class="hidden" accept="image/*">
+                            </label>
                         </div>
-                        <div class="flex justify-between items-center text-[10px] text-gray-500 dark:text-gray-400 font-medium px-1">
-                            <span>Points mapped: <b id="warp-point-counter" class="text-blue-600 dark:text-blue-400">0</b> (Min: 3)</span>
-                            <span>Points link corresponding landmarks.</span>
+
+                        <!-- Subtle Points Mapped Counter Floating Overlay at the bottom -->
+                        <div class="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium py-1 px-2.5 rounded-full z-[1000] flex items-center gap-1.5 shadow-sm">
+                            <span>Points mapped: <b id="warp-point-counter" class="text-blue-400">0</b></span>
+                            <span class="opacity-50">|</span>
+                            <span>Min: 3</span>
                         </div>
                     </div>
-
-                    <!-- Advanced Warp Toggle / Center / File Row -->
-                    <div class="flex gap-2 w-full mt-2 shrink-0">
-                        <label class="flex-1 flex flex-col items-center justify-center bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-[10px] font-bold py-2 rounded-lg transition text-center shadow-sm cursor-pointer">
-                            <i data-lucide="image" class="w-4 h-4 mb-1"></i>
-                            <span>Image File</span>
-                            <input type="file" id="overlay-file-input" class="hidden" accept="image/*">
-                        </label>
-                        <button type="button" id="btn-trigger-reselect" onclick="triggerOverlayReselect()" class="flex-1 flex flex-col items-center justify-center bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-[10px] font-bold py-2 rounded-lg transition text-center shadow-sm">
-                            <i data-lucide="crosshair" class="w-4 h-4 mb-1"></i>
-                            <span>Re-centre Image</span>
-                        </button>
-                        <button type="button" id="btn-toggle-advanced-mode" onclick="toggleAdvancedWarpMode()" class="flex-1 flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 text-[10px] font-bold py-2 rounded-lg transition text-center shadow-sm">
-                            <i data-lucide="scan" class="w-4 h-4 mb-1"></i>
-                            <span id="text-toggle-advanced-mode">Warp OFF</span>
-                        </button>
-                    </div>
-
                 </div>
             </div>
         </div>
 
-        <div class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-between items-center space-x-3 shrink-0">
-            <button id="panel-delete-btn" class="px-4 py-2 text-red-600 dark:text-red-400 text-sm font-medium hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg transition hidden">Delete</button>
-            <div class="flex space-x-3 ml-auto">
-                <button onclick="cancelItem()" class="px-4 py-2 text-gray-600 dark:text-gray-300 text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition">Cancel</button>
+        <!-- Adaptive Bottom Footer Bar (Contains Name Input, Actions, Delete) -->
+        <div class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center gap-3 shrink-0">
+            <button id="panel-delete-btn" class="px-3 py-2 text-red-600 dark:text-red-400 text-sm font-medium hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg transition hidden shrink-0 flex items-center gap-1">
+                <i data-lucide="trash-2" class="w-4 h-4"></i> <span>Delete</span>
+            </button>
+            <div class="flex-1 min-w-0">
+                <input type="text" id="item-name" placeholder="Name / Label" class="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+            </div>
+            <div class="flex items-center space-x-1.5 shrink-0">
+                <button onclick="cancelItem()" class="px-3 py-2 text-gray-600 dark:text-gray-300 text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition">Cancel</button>
                 <button id="panel-save-btn" onclick="saveItem()" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 rounded-lg shadow-md transition">Save</button>
             </div>
         </div>
@@ -979,26 +932,6 @@
             }
         });
 
-        // --- Custom Rotated Image Overlay (Standard Mode) ---
-        L.RotatedImageOverlay = L.ImageOverlay.extend({
-            options: { angle: 0 },
-            setAngle: function(angle) {
-                this.options.angle = angle;
-                this._applyRotation();
-            },
-            _reset: function() {
-                L.ImageOverlay.prototype._reset.call(this);
-                this._applyRotation();
-            },
-            _applyRotation: function() {
-                if (!this._image) return;
-                let t = this._image.style.transform;
-                t = t.replace(/\s*rotate\([^)]+\)/g, ''); 
-                this._image.style.transform = t + ' rotate(' + (this.options.angle || 0) + 'deg)';
-                this._image.style.transformOrigin = 'center center';
-            }
-        });
-
         // --- Core Configuration & State ---
         const osApiKey = 'VEAc2NZ4i1s6qDeC5D5H6S77PG72TrgW'; 
         let map, userPosMarker, navPolyline;
@@ -1018,8 +951,6 @@
         let currentDialRotation = 0; 
         let currentMarkerRotation = 0; 
         let isBottomPanelOpen = false;
-        let isPlacingOverlay = false;
-        let oldImgCenterBackup = null;
         let currentDrawerTab = 'maps';
         
         let globalMarkerColor = '#ef4444';
@@ -1040,15 +971,9 @@
         let activeOverlayBlobUrl = null;
         
         // Active display layers
-        let leafletImageOverlay = null; // Used in standard mode
-        let leafletRubberSheetOverlay = null; // Used in advanced warp mode
+        let leafletRubberSheetOverlay = null; 
         
         // General positioning options
-        let overlayMode = 'standard'; // 'standard' or 'warp'
-        let imgCenter = null;
-        let imgWidthLng = 0;
-        let imgHeightLat = 0;
-        let imgRotation = 0;
         let imgOpacity = 60;
         let calImgObj = new Image();
 
@@ -1216,24 +1141,6 @@
             lSlider.style.background = `linear-gradient(to right, #000, hsl(${h}, ${s}%, 50%), #fff)`;
         }
 
-        function toggleCustomColor(prefix) {
-            const panel = document.getElementById(`custom-panel-${prefix}`);
-            const text = document.getElementById(`toggle-text-${prefix}`);
-            if (panel.classList.contains('hidden')) {
-                panel.classList.remove('hidden');
-                panel.classList.add('flex');
-                text.innerText = 'Hide Custom Color';
-                
-                const hex = document.getElementById(prefix === 'marker' ? 'setting-color' : 'setting-nav-color').value;
-                const hsl = hexToHSL(hex);
-                updateSliderBackgrounds(prefix, hsl.h, hsl.s, hsl.l);
-            } else {
-                panel.classList.add('hidden');
-                panel.classList.remove('flex');
-                text.innerText = 'Custom Color';
-            }
-        }
-
         function toggleScaleSlider() {
             const enabled = document.getElementById('setting-scale-enabled').checked;
             const container = document.getElementById('scale-slider-container');
@@ -1386,7 +1293,7 @@
             lucide.createIcons();
             renderBaseMapsList();
             renderOverlayList();
-            setupOverlayHoldControls();
+            setupOpacityControl();
             updateOpacitySliderVisibility();
         }
         
@@ -1404,6 +1311,7 @@
             localStorage.setItem('maverish_basemap_order', JSON.stringify(order));
         }
 
+        // Restore saved map drawer positions
         function loadBaseMapOrder() {
             const savedData = localStorage.getItem('maverish_basemap_order');
             if (savedData) {
@@ -1547,13 +1455,14 @@
             }
 
             if (activeOverlayImgBlob) {
-                if (overlayMode === 'warp' && warpPoints.length >= 3) {
+                if (warpPoints.length >= 3) {
                     renderRubberSheetOverlay();
-                } else if (overlayMode === 'standard') {
-                    const opacity = imgOpacity / 100;
-                    leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation }).addTo(map);
-                    renderLeafletOverlay();
                 }
+            }
+
+            // Ensure the map-side warp markers remain visible when rebuilding coordinates matrix
+            if (isBottomPanelOpen && document.getElementById('edit-item-type').value === 'overlay') {
+                rebuildWarpMarkersOnMap();
             }
         }
 
@@ -1565,31 +1474,7 @@
             map.on('click', (e) => {
                 if (isDeletingPoint) return;
 
-                if (isPlacingOverlay) {
-                    isPlacingOverlay = false;
-                    document.getElementById('map-instruction-overlay').classList.add('hidden');
-                    document.getElementById('map').classList.remove('map-placing-overlay');
-                    
-                    imgCenter = e.latlng;
-                    
-                    if (imgWidthLng === 0) {
-                        imgRotation = 0;
-                        imgOpacity = parseInt(document.getElementById('floating-opacity-slider').value) || 60;
-                        const aspect = calImgObj.naturalWidth / calImgObj.naturalHeight;
-                        const mapBounds = map.getBounds();
-                        imgWidthLng = (mapBounds.getEast() - mapBounds.getWest()) * 0.4; 
-                        imgHeightLat = (imgWidthLng * Math.cos(imgCenter.lat * Math.PI / 180)) / aspect;
-                    }
-                    
-                    if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
-                    const opacity = imgOpacity / 100;
-                    leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation }).addTo(map);
-                    renderLeafletOverlay();
-                    
-                    setupPanelUI('overlay', document.getElementById('edit-item-id').value);
-                    animateMapSqueeze(true);
-                    updateOpacitySliderVisibility();
-                } else if (isBottomPanelOpen && document.getElementById('edit-item-type').value === 'overlay' && overlayMode === 'warp') {
+                if (isBottomPanelOpen && document.getElementById('edit-item-type').value === 'overlay') {
                     if (currentWarpStep !== 'map') return;
                     
                     const pointIdx = warpPoints.length - 1;
@@ -1812,7 +1697,6 @@
                     currentBaseLayer.addTo(map);
                     
                     try {
-                        if (leafletImageOverlay && typeof leafletImageOverlay.bringToFront === 'function') leafletImageOverlay.bringToFront();
                         if (leafletRubberSheetOverlay && typeof leafletRubberSheetOverlay.bringToFront === 'function') leafletRubberSheetOverlay.bringToFront();
                         if (navPolyline && typeof navPolyline.bringToFront === 'function') navPolyline.bringToFront();
                     } catch (e) { console.warn('Could not bring layers to front', e); }
@@ -1936,11 +1820,9 @@
 
         function openPanelForNew(type) {
             if (window.innerWidth < 768) closeDrawerIfOpen();
-            overlayMode = 'standard'; 
 
             if (type === 'overlay') {
                 unloadOverlay(); 
-                imgWidthLng = 0; 
             }
 
             setupPanelUI(type, null);
@@ -1948,6 +1830,7 @@
             updateOpacitySliderVisibility();
         }
 
+        // Sets up edit parameters for either point types or overlays
         function openPanelForEdit(type, id) {
             if (window.innerWidth < 768) closeDrawerIfOpen();
             
@@ -1960,12 +1843,12 @@
                 const m = markers.find(x => x.id === id);
                 if (m) animateMapSqueeze(true, [m.lat, m.lng]);
             } else {
-                if (overlayMode === 'warp' && warpPoints.length > 0) {
+                if (warpPoints.length > 0) {
                     const validPts = warpPoints.filter(p => p.map);
                     if (validPts.length > 0) animateMapSqueeze(true, [validPts[0].map.lat, validPts[0].map.lng]);
                     else animateMapSqueeze(true);
                 } else {
-                    animateMapSqueeze(true, [imgCenter.lat, imgCenter.lng]);
+                    animateMapSqueeze(true);
                 }
             }
             updateOpacitySliderVisibility();
@@ -1994,7 +1877,7 @@
                 uiLayer.classList.add('map-squeezed');
 
                 pContent.classList.remove('hidden'); oContent.classList.add('hidden');
-                document.getElementById('name-label').innerText = 'Point Name / Label';
+                nameInput.placeholder = 'Point Name / Label (e.g. Summit)';
                 
                 if (editId) {
                     const m = markers.find(x => x.id === editId);
@@ -2034,7 +1917,11 @@
                 
             } else if (type === 'overlay') {
                 pContent.classList.add('hidden'); oContent.classList.remove('hidden');
-                document.getElementById('name-label').innerText = 'Overlay Map Name';
+                nameInput.placeholder = 'Overlay Map Name (e.g. Trail Map)';
+                
+                bPanel.style.height = ''; 
+                mapContainer.classList.add('map-squeezed');
+                uiLayer.classList.add('map-squeezed');
                 
                 removeAllWarpMarkers(); 
                 resetDeletePointMode();
@@ -2059,8 +1946,17 @@
                     syncOpacitySlider();
                 }
 
-                updateAdvancedWarpLayout();
+                setTimeout(() => {
+                    warpImageMap.invalidateSize();
+                    if (warpImageLayer) {
+                        const bounds = [[-calImgObj.naturalHeight, 0], [0, calImgObj.naturalWidth]]; 
+                        warpImageMap.fitBounds(bounds);
+                    }
+                }, 300);
+
+                rebuildWarpMarkersOnMap();
             }
+            lucide.createIcons();
         }
 
         function saveItem() {
@@ -2081,7 +1977,7 @@
 
         // --- CROPPING PRE-PROCESSOR HOOKS ---
 
-        document.getElementById('overlay-file-input').addEventListener('change', function(e) {
+        function handleFileSelect(e) {
             const file = e.target.files[0];
             if (!file) {
                 if(!activeOverlayImgBlob) closeBottomPanel(); 
@@ -2107,7 +2003,10 @@
             };
             reader.readAsDataURL(file);
             e.target.value = ''; 
-        });
+        }
+
+        document.getElementById('overlay-file-input').addEventListener('change', handleFileSelect);
+        document.getElementById('overlay-file-input-header').addEventListener('change', handleFileSelect);
 
         function closeCropModal() {
             closeModals();
@@ -2135,8 +2034,6 @@
             calImgObj = new Image();
             calImgObj.src = activeOverlayBlobUrl;
             calImgObj.onload = () => {
-                const isNew = !document.getElementById('edit-item-id').value;
-
                 document.getElementById('warp-image-placeholder').classList.add('hidden');
                 if (warpImageLayer) warpImageMap.removeLayer(warpImageLayer);
                 
@@ -2146,166 +2043,9 @@
                 warpImageMap.fitBounds(bounds);
                 setTimeout(() => warpImageMap.invalidateSize(), 200);
 
-                if (overlayMode === 'standard') {
-                    if (isNew || imgWidthLng === 0) {
-                        imgWidthLng = 0; 
-                        isPlacingOverlay = true;
-                        
-                        document.getElementById('bottom-panel').classList.replace('panel-open', 'panel-closed');
-                        document.getElementById('map').classList.remove('map-squeezed');
-                        document.getElementById('ui-layer').classList.remove('map-squeezed');
-                        isBottomPanelOpen = false;
-                        updateOpacitySliderVisibility();
-
-                        document.getElementById('instruction-overlay-text').innerText = "Click map to place image center.";
-                        document.getElementById('map-instruction-overlay').classList.remove('hidden');
-                        document.getElementById('map').classList.add('map-placing-overlay');
-                        lucide.createIcons();
-                    } else {
-                        const aspect = calImgObj.naturalWidth / calImgObj.naturalHeight;
-                        imgHeightLat = (imgWidthLng * Math.cos(imgCenter.lat * Math.PI / 180)) / aspect;
-                        
-                        if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
-                        const opacity = imgOpacity / 100;
-                        leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity, interactive: false, angle: imgRotation }).addTo(map);
-                        renderLeafletOverlay();
-                        updateOpacitySliderVisibility();
-                    }
-                } else {
-                    clearWarpPoints();
-                }
-            };
-        }
-
-        function triggerOverlayReselect() {
-            oldImgCenterBackup = L.latLng(imgCenter.lat, imgCenter.lng);
-            isPlacingOverlay = true;
-            
-            document.getElementById('bottom-panel').classList.replace('panel-open', 'panel-closed');
-            document.getElementById('map').classList.remove('map-squeezed');
-            document.getElementById('ui-layer').classList.remove('map-squeezed');
-            isBottomPanelOpen = false;
-            
-            animateMapSqueeze(false);
-            updateOpacitySliderVisibility();
-
-            document.getElementById('instruction-overlay-text').innerText = "Click map to place image center.";
-            document.getElementById('map-instruction-overlay').classList.remove('hidden');
-            document.getElementById('map').classList.add('map-placing-overlay');
-            lucide.createIcons();
-        }
-
-        function cancelOverlayPlacement() {
-            isPlacingOverlay = false;
-            document.getElementById('map-instruction-overlay').classList.add('hidden');
-            document.getElementById('map').classList.remove('map-placing-overlay');
-            
-            const editId = document.getElementById('edit-item-id').value;
-            if (!editId || imgWidthLng === 0) {
-                unloadOverlay();
-            } else {
-                if (oldImgCenterBackup) imgCenter = L.latLng(oldImgCenterBackup.lat, oldImgCenterBackup.lng);
-                renderLeafletOverlay();
-                setupPanelUI('overlay', editId);
-                animateMapSqueeze(true);
+                clearWarpPoints(); 
                 updateOpacitySliderVisibility();
-            }
-        }
-
-        function renderLeafletOverlay() {
-            if (!leafletImageOverlay || !imgCenter) return;
-            const halfW = imgWidthLng / 2;
-            const halfH = imgHeightLat / 2;
-            const bounds = L.latLngBounds(
-                [imgCenter.lat - halfH, imgCenter.lng - halfW],
-                [imgCenter.lat + halfH, imgCenter.lng + halfW]
-            );
-            leafletImageOverlay.setBounds(bounds);
-            leafletImageOverlay.setAngle(imgRotation);
-            leafletImageOverlay.setOpacity(imgOpacity / 100);
-        }
-
-        // --- Toggle Advanced Warp Mode ---
-        function toggleAdvancedWarpMode() {
-            overlayMode = overlayMode === 'standard' ? 'warp' : 'standard';
-            resetDeletePointMode();
-            
-            if (overlayMode === 'standard') {
-                removeRubberSheetOverlay();
-                if (activeOverlayBlobUrl && imgCenter) {
-                    if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
-                    leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity: imgOpacity/100, interactive: false, angle: imgRotation }).addTo(map);
-                    renderLeafletOverlay();
-                }
-            } else {
-                if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
-                if (warpPoints.length >= 3) {
-                    renderRubberSheetOverlay();
-                }
-            }
-            
-            updateAdvancedWarpLayout();
-            animateMapSqueeze(true);
-        }
-
-        function updateAdvancedWarpLayout() {
-            const bPanel = document.getElementById('bottom-panel');
-            const mapContainer = document.getElementById('map');
-            const uiLayer = document.getElementById('ui-layer');
-
-            const advBtn = document.getElementById('btn-toggle-advanced-mode');
-            const advBtnText = document.getElementById('text-toggle-advanced-mode');
-            const centerBtn = document.getElementById('btn-trigger-reselect');
-            
-            const stdBlock = document.getElementById('overlay-standard-controls');
-            const advBlock = document.getElementById('overlay-advanced-controls');
-
-            if (overlayMode === 'warp') {
-                advBtnText.innerText = "Warp ON";
-                advBtn.classList.replace('bg-gray-100', 'bg-blue-600');
-                advBtn.classList.replace('text-gray-700', 'text-white');
-                advBtn.classList.replace('border-gray-200', 'border-blue-700');
-                advBtn.classList.replace('dark:bg-gray-700', 'dark:bg-blue-600');
-                advBtn.classList.replace('dark:border-gray-600', 'dark:border-blue-500');
-                
-                centerBtn.classList.add('opacity-50', 'pointer-events-none');
-                
-                stdBlock.classList.add('hidden');
-                advBlock.classList.remove('hidden');
-
-                bPanel.style.height = ''; 
-                mapContainer.classList.add('map-squeezed');
-                uiLayer.classList.add('map-squeezed');
-
-                setTimeout(() => {
-                    warpImageMap.invalidateSize();
-                    if (warpImageLayer) {
-                        const bounds = [[-calImgObj.naturalHeight, 0], [0, calImgObj.naturalWidth]]; 
-                        warpImageMap.fitBounds(bounds);
-                    }
-                }, 300);
-
-                rebuildWarpMarkersOnMap();
-
-            } else {
-                advBtnText.innerText = "Warp OFF";
-                advBtn.classList.replace('bg-blue-600', 'bg-gray-100');
-                advBtn.classList.replace('text-white', 'text-gray-700');
-                advBtn.classList.replace('border-blue-700', 'border-gray-200');
-                advBtn.classList.replace('dark:bg-blue-600', 'dark:bg-gray-700');
-                advBtn.classList.replace('dark:border-blue-500', 'dark:border-gray-600');
-
-                centerBtn.classList.remove('opacity-50', 'pointer-events-none');
-
-                stdBlock.classList.remove('hidden');
-                advBlock.classList.add('hidden');
-
-                bPanel.style.height = ''; 
-                mapContainer.classList.add('map-squeezed');
-                uiLayer.classList.add('map-squeezed');
-
-                removeAllWarpMarkers();
-            }
+            };
         }
 
         function rebuildWarpMarkersOnMap() {
@@ -2378,48 +2118,11 @@
             }
         }
 
-        // Fine Controls setup
-        function addHoldListener(btnId, action) {
-            const btn = document.getElementById(btnId);
-            if(!btn) return;
-            let reqId = null; let lastTime = 0;
-            const loop = (time) => {
-                if (time - lastTime >= 40) { action(); lastTime = time; }
-                reqId = requestAnimationFrame(loop);
-            };
-            const start = (e) => {
-                if (e.type === 'touchstart' && e.cancelable) e.preventDefault();
-                if (!reqId) { action(); lastTime = performance.now(); reqId = requestAnimationFrame(loop); }
-            };
-            const stop = (e) => {
-                if (e && e.type === 'touchend' && e.cancelable) e.preventDefault();
-                if (reqId) { cancelAnimationFrame(reqId); reqId = null; }
-            };
-            btn.addEventListener('mousedown', start); btn.addEventListener('mouseup', stop); btn.addEventListener('mouseleave', stop);
-            btn.addEventListener('touchstart', start, {passive: false}); 
-            btn.addEventListener('touchend', stop, {passive: false}); 
-            btn.addEventListener('touchcancel', stop, {passive: false});
-        }
-
-        function setupOverlayHoldControls() {
-            addHoldListener('btn-nudge-up', () => { imgCenter.lat += (imgHeightLat * 0.01); renderLeafletOverlay(); });
-            addHoldListener('btn-nudge-down', () => { imgCenter.lat -= (imgHeightLat * 0.01); renderLeafletOverlay(); });
-            addHoldListener('btn-nudge-left', () => { imgCenter.lng -= (imgWidthLng * 0.01); renderLeafletOverlay(); });
-            addHoldListener('btn-nudge-right', () => { imgCenter.lng += (imgWidthLng * 0.01); renderLeafletOverlay(); });
-            addHoldListener('btn-scale-up', () => { imgWidthLng *= 1.02; imgHeightLat *= 1.02; renderLeafletOverlay(); });
-            addHoldListener('btn-scale-down', () => { imgWidthLng *= 0.98; imgHeightLat *= 0.98; renderLeafletOverlay(); });
-            addHoldListener('btn-rotate-left', () => { imgRotation -= 1; renderLeafletOverlay(); });
-            addHoldListener('btn-rotate-right', () => { imgRotation += 1; renderLeafletOverlay(); });
-
+        function setupOpacityControl() {
             document.getElementById('floating-opacity-slider').addEventListener('input', (e) => {
                 imgOpacity = e.target.value;
                 document.getElementById('floating-opacity-val').innerText = imgOpacity + '%';
-                
-                if (overlayMode === 'warp') {
-                    if (leafletRubberSheetOverlay) leafletRubberSheetOverlay.setOpacity(imgOpacity / 100);
-                } else {
-                    renderLeafletOverlay();
-                }
+                if (leafletRubberSheetOverlay) leafletRubberSheetOverlay.setOpacity(imgOpacity / 100);
             });
         }
 
@@ -2448,7 +2151,7 @@
         async function saveOverlay() {
             if (!activeOverlayImgBlob) { showAlert("Missing Image", "Please choose an image file for this overlay."); return; }
             
-            if (overlayMode === 'warp' && warpPoints.filter(p => p.map !== null).length < 3) {
+            if (warpPoints.filter(p => p.map !== null).length < 3) {
                 showAlert("Warp Points Needed", "Warping requires at least 3 completed control points mapping the image to the layout map.");
                 return;
             }
@@ -2465,22 +2168,12 @@
                 return;
             }
 
-            const calibration = {
-                lat: imgCenter ? imgCenter.lat : map.getCenter().lat,
-                lng: imgCenter ? imgCenter.lng : map.getCenter().lng,
-                width: imgWidthLng,
-                height: imgHeightLat,
-                rotation: imgRotation,
-                opacity: imgOpacity
-            };
-
             const payload = {
                 id, name, 
                 imageBuffer: imageBuffer,
                 imageType: activeOverlayImgBlob.type,
-                mode: overlayMode, 
-                calibration: calibration,
-                warpPoints: overlayMode === 'warp' ? warpPoints : [], 
+                opacity: imgOpacity,
+                warpPoints: warpPoints,
                 savedView: {
                     lat: map.getCenter().lat,
                     lng: map.getCenter().lng,
@@ -2516,14 +2209,12 @@
                 const data = await idbKeyval.get(id);
                 if (!data) return;
 
-                if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
                 removeRubberSheetOverlay();
                 resetDeletePointMode();
                 
                 if (activeOverlayBlobUrl) URL.revokeObjectURL(activeOverlayBlobUrl);
 
                 activeOverlayId = id;
-                overlayMode = data.mode || 'standard';
                 
                 let blob;
                 if (data.imageBuffer) {
@@ -2537,11 +2228,7 @@
                 activeOverlayImgBlob = blob;
                 activeOverlayBlobUrl = URL.createObjectURL(blob);
 
-                imgCenter = L.latLng(data.calibration.lat, data.calibration.lng);
-                imgWidthLng = data.calibration.width;
-                imgHeightLat = data.calibration.height;
-                imgRotation = data.calibration.rotation;
-                imgOpacity = data.calibration.opacity || 60;
+                imgOpacity = data.opacity || (data.calibration ? data.calibration.opacity : 60);
                 warpPoints = data.warpPoints || [];
                 currentWarpStep = 'img';
 
@@ -2553,12 +2240,7 @@
                     const bounds = [[-calImgObj.naturalHeight, 0], [0, calImgObj.naturalWidth]]; 
                     warpImageLayer = L.imageOverlay(activeOverlayBlobUrl, bounds).addTo(warpImageMap);
                     
-                    if (overlayMode === 'warp') {
-                        renderRubberSheetOverlay();
-                    } else {
-                        leafletImageOverlay = new L.RotatedImageOverlay(activeOverlayBlobUrl, [[0,0],[0,0]], { opacity: imgOpacity/100, interactive: false, angle: imgRotation }).addTo(map);
-                        renderLeafletOverlay();
-                    }
+                    renderRubberSheetOverlay();
                 };
 
                 syncOpacitySlider();
@@ -2574,8 +2256,9 @@
                         targetZoom = Math.max(0, Math.min(19, targetZoom + 6));
                     }
                     map.setView([data.savedView.lat, data.savedView.lng], targetZoom);
-                } else {
-                    map.flyTo(imgCenter, Math.min(map.getMaxZoom(), 14));
+                } else if (warpPoints.length > 0) {
+                    const validPts = warpPoints.filter(p => p.map);
+                    if (validPts.length > 0) map.flyTo([validPts[0].map.lat, validPts[0].map.lng], 14);
                 }
                 
                 renderOverlayList();
@@ -2604,8 +2287,9 @@
                         targetZoom = Math.max(0, Math.min(19, targetZoom + 6));
                     }
                     map.flyTo([data.savedView.lat, data.savedView.lng], targetZoom);
-                } else if (data.calibration) {
-                    map.flyTo([data.calibration.lat, data.calibration.lng], Math.min(map.getMaxZoom(), 14));
+                } else if (data.warpPoints) {
+                    const validPts = data.warpPoints.filter(p => p.map);
+                    if (validPts.length > 0) map.flyTo([validPts[0].map.lat, validPts[0].map.lng], 14);
                 }
                 
                 if (window.innerWidth < 768) closeDrawerIfOpen();
@@ -2613,8 +2297,6 @@
         }
 
         function unloadOverlay() {
-            if (leafletImageOverlay) map.removeLayer(leafletImageOverlay);
-            leafletImageOverlay = null;
             removeRubberSheetOverlay();
 
             if (warpImageLayer) {
@@ -2633,10 +2315,6 @@
             updateWarpUI();
 
             if (activeOverlayBlobUrl) { URL.revokeObjectURL(activeOverlayBlobUrl); activeOverlayBlobUrl = null; }
-            
-            isPlacingOverlay = false;
-            document.getElementById('map-instruction-overlay')?.classList.add('hidden');
-            document.getElementById('map')?.classList.remove('map-placing-overlay');
             
             renderOverlayList();
             updateOpacitySliderVisibility();
@@ -2920,6 +2598,7 @@
             if (isAutoCentering) map.setView(latlng);
         }
 
+        // Centers coordinates on GPS position
         function centerOnUser() {
             if (userPos) {
                 isAutoCentering = true;
@@ -2978,7 +2657,6 @@
         function handleOrientation(event) {
             let heading = null;
             
-            // Adjust for screen rotation/landscape alignment offsets
             let rotation = 0;
             if (window.screen && window.screen.orientation && typeof window.screen.orientation.angle === 'number') {
                 rotation = window.screen.orientation.angle;
@@ -3364,7 +3042,6 @@
                 currentBaseLayer = getOSLayerGroup();
                 currentBaseLayer.addTo(map);
                 
-                if (leafletImageOverlay && typeof leafletImageOverlay.bringToFront === 'function') leafletImageOverlay.bringToFront();
                 if (leafletRubberSheetOverlay && typeof leafletRubberSheetOverlay.bringToFront === 'function') leafletRubberSheetOverlay.bringToFront();
                 if (navPolyline && typeof navPolyline.bringToFront === 'function') navPolyline.bringToFront();
             }
