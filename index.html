@@ -986,6 +986,9 @@
         
         let initialCenter = [51.505, -0.09];
         let initialZoom = 10;
+        
+        let initialOverlayId = null;
+        let initialNavigatingId = null;
 
         // Overlay State
         let overlays = []; // from idb
@@ -1308,6 +1311,26 @@
             initWarpImageMap();
             loadMarkersFromStorage();
             await loadOverlaysMeta();
+            
+            // Restore persistent sessions before hooking up interactions
+            if (initialNavigatingId) {
+                const targetMarker = markers.find(x => x.id === initialNavigatingId);
+                if (targetMarker) {
+                    navigatingToId = initialNavigatingId;
+                    document.getElementById('nav-target-name').innerText = escapeHTML(targetMarker.name);
+                    document.getElementById('nav-bar').classList.remove('-translate-y-full');
+                    if (!targetMarker.isVisible) {
+                        targetMarker.isVisible = true;
+                        targetMarker.leafletMarker.addTo(map);
+                        saveMarkersToStorage();
+                    }
+                }
+            }
+            
+            if (initialOverlayId) {
+                await activateOverlay(initialOverlayId, true); // true = prevent map snapping away from saved coordinate center
+            }
+
             setupDrawerSwiping();
             initSortableLists();
             initColorPicker('marker');
@@ -1316,6 +1339,7 @@
             lucide.createIcons();
             renderBaseMapsList();
             renderOverlayList();
+            renderMarkerList(); // Ensures nav list items show active green icon correctly
             setupOpacityControl();
             updateOpacitySliderVisibility();
         }
@@ -1821,7 +1845,7 @@
                 if (!editId) {
                     unloadOverlay();
                 } else {
-                    activateOverlay(editId); 
+                    activateOverlay(editId, true); // true = prevent fighting map perspective on cancel
                 }
             }
             
@@ -2219,13 +2243,14 @@
                 closeBottomPanel();
                 renderOverlayList();
                 updateOpacitySliderVisibility();
+                saveMapState();
             } catch(e) { 
                 console.error("IndexedDB Save Failed", e);
                 showAlert("Save Failed", "Could not save overlay data: " + e.message);
             }
         }
 
-        async function activateOverlay(id) {
+        async function activateOverlay(id, preventCenter = false) {
             try {
                 isAutoCentering = false;
                 updateCenterButtonUI();
@@ -2269,26 +2294,29 @@
 
                 syncOpacitySlider();
                 
-                if (data.savedView) {
-                    let targetZoom = data.savedView.zoom;
-                    const currentIsOS = (currentMapType === 'os_combined');
-                    const savedIsOS = data.savedView.hasOwnProperty('isOS') ? data.savedView.isOS : (data.savedView.zoom <= 13 && currentMapType === 'os_combined');
-                    
-                    if (currentIsOS && !savedIsOS) {
-                        targetZoom = Math.max(0, Math.min(13, targetZoom - 6));
-                    } else if (!currentIsOS && savedIsOS) {
-                        targetZoom = Math.max(0, Math.min(19, targetZoom + 6));
+                if (!preventCenter) {
+                    if (data.savedView) {
+                        let targetZoom = data.savedView.zoom;
+                        const currentIsOS = (currentMapType === 'os_combined');
+                        const savedIsOS = data.savedView.hasOwnProperty('isOS') ? data.savedView.isOS : (data.savedView.zoom <= 13 && currentMapType === 'os_combined');
+                        
+                        if (currentIsOS && !savedIsOS) {
+                            targetZoom = Math.max(0, Math.min(13, targetZoom - 6));
+                        } else if (!currentIsOS && savedIsOS) {
+                            targetZoom = Math.max(0, Math.min(19, targetZoom + 6));
+                        }
+                        map.setView([data.savedView.lat, data.savedView.lng], targetZoom);
+                    } else if (warpPoints.length > 0) {
+                        const validPts = warpPoints.filter(p => p.map);
+                        if (validPts.length > 0) map.flyTo([validPts[0].map.lat, validPts[0].map.lng], 14);
                     }
-                    map.setView([data.savedView.lat, data.savedView.lng], targetZoom);
-                } else if (warpPoints.length > 0) {
-                    const validPts = warpPoints.filter(p => p.map);
-                    if (validPts.length > 0) map.flyTo([validPts[0].map.lat, validPts[0].map.lng], 14);
                 }
                 
                 renderOverlayList();
                 updateOpacitySliderVisibility();
                 if(window.innerWidth < 768) closeDrawerIfOpen();
                 
+                saveMapState();
             } catch(e) { showAlert("Error", "Could not load map overlay."); }
         }
 
@@ -2342,6 +2370,7 @@
             
             renderOverlayList();
             updateOpacitySliderVisibility();
+            saveMapState();
         }
 
         function renderOverlayList() {
@@ -2540,7 +2569,6 @@
                         newM.leafletMarker = createLeafletMarker(newM);
                         markers.push(newM);
                     });
-                    renderMarkerList();
                 } catch (e) { console.error("Failed to load markers", e); }
             }
         }
@@ -2927,7 +2955,7 @@
         function startNavigation(id) {
             const m = markers.find(x => x.id === id);
             if (!m) return;
-            if (!userPos) { showAlert("GPS Required", "Waiting for GPS signal to compute navigation path."); return; }
+            
             if (!m.isVisible) toggleMarkerVisibility(id);
             navigatingToId = id;
             document.getElementById('nav-target-name').innerText = escapeHTML(m.name);
@@ -2935,19 +2963,32 @@
             
             if (window.innerWidth < 768) closeDrawerIfOpen();
             
-            if (navPolyline) { map.removeLayer(navPolyline); }
-            navPolyline = L.polyline([], getNavLineStyle()).addTo(map);
-            updateNavigation();
+            if (!navPolyline) {
+                navPolyline = L.polyline([], getNavLineStyle()).addTo(map);
+            }
             
-            const bounds = L.latLngBounds([userPos.lat, userPos.lng], [m.lat, m.lng]);
-            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+            if (userPos) {
+                updateNavigation();
+                const bounds = L.latLngBounds([userPos.lat, userPos.lng], [m.lat, m.lng]);
+                map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+            } else {
+                document.getElementById('nav-distance').innerText = "Waiting for GPS...";
+                const largeDist = document.getElementById('large-compass-distance');
+                if (largeDist) largeDist.innerText = "Wait...";
+            }
+            
             renderMarkerList();
+            saveMapState();
         }
 
         function updateNavigation() {
             if (!navigatingToId || !userPos) return;
             const target = markers.find(x => x.id === navigatingToId);
             if (!target) return;
+
+            if (!navPolyline) {
+                navPolyline = L.polyline([], getNavLineStyle()).addTo(map);
+            }
 
             navPolyline.setLatLngs([[userPos.lat, userPos.lng], [target.lat, target.lng]]);
             const distMeters = map.distance([userPos.lat, userPos.lng], [target.lat, target.lng]);
@@ -3005,6 +3046,7 @@
             document.getElementById('nav-bar').classList.add('-translate-y-full');
             if (navPolyline) { map.removeLayer(navPolyline); navPolyline = null; }
             renderMarkerList();
+            saveMapState();
         }
 
         function calculateBearing(lat1, lon1, lat2, lon2) {
@@ -3095,6 +3137,8 @@
                     if (parsed.scaleFactor !== undefined) globalOSMapScaleFactor = parsed.scaleFactor;
                     if (parsed.center) initialCenter = [parsed.center.lat, parsed.center.lng];
                     if (parsed.zoom) initialZoom = parsed.zoom;
+                    if (parsed.activeOverlayId) initialOverlayId = parsed.activeOverlayId;
+                    if (parsed.navigatingToId) initialNavigatingId = parsed.navigatingToId;
                 } catch(e) {}
             }
         }
@@ -3106,7 +3150,9 @@
                 center: map.getCenter(), zoom: map.getZoom(),
                 force25k: globalForce25kAtZoom7,
                 scaleEnabled: globalOSMapScalingEnabled, scaleFactor: globalOSMapScaleFactor,
-                darkMode: globalDarkMode
+                darkMode: globalDarkMode,
+                activeOverlayId: activeOverlayId,
+                navigatingToId: navigatingToId
             };
             localStorage.setItem('maverish_settings', JSON.stringify(settings));
         }
