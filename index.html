@@ -983,6 +983,7 @@
         let globalOSMapScalingEnabled = false; // OS Map scaling setting (defaults OFF)
         let globalOSMapScaleFactor = 80;
         let globalDarkMode = false;
+        let hasSavedState = false;
         
         let initialCenter = [51.505, -0.09];
         let initialZoom = 10;
@@ -2643,7 +2644,10 @@
             const latlng = [userPos.lat, userPos.lng];
             if (!map.hasLayer(userPosMarker)) {
                 userPosMarker.addTo(map);
-                map.setView(latlng, map.getZoom() || 14); 
+                // Honor saved perspective, only jump on brand new fresh boots
+                if (!hasSavedState) {
+                    map.setView(latlng, currentMapType === 'os_combined' ? 9 : 14); 
+                }
             }
             userPosMarker.setLatLng(latlng);
             updateHeadingUI();
@@ -3122,6 +3126,7 @@
         function loadSettingsFromStorage() {
             const saved = localStorage.getItem('maverish_settings');
             if (saved) {
+                hasSavedState = true;
                 try {
                     const parsed = JSON.parse(saved);
                     if (parsed.darkMode !== undefined) {
