@@ -404,6 +404,7 @@
             </div>
             <div class="flex items-center space-x-1.5 shrink-0">
                 <button onclick="closePreviewPanel()" class="px-3 py-2 text-gray-600 dark:text-gray-300 text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition">Cancel</button>
+                <button onclick="editOverlayFromPreview()" class="px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg transition">Edit</button>
                 <button onclick="applyPreview()" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 rounded-lg shadow-md transition">Apply</button>
             </div>
         </div>
@@ -1013,6 +1014,7 @@
         let currentMarkerRotation = 0; 
         let isBottomPanelOpen = false;
         let isPreviewPanelOpen = false;
+        let returnToPreviewId = null;
         let currentDrawerTab = 'maps';
         
         let globalMarkerColor = '#ef4444';
@@ -1894,6 +1896,15 @@
             }
             
             closeBottomPanel();
+            
+            // If the user cancelled an edit session initiated from the preview panel, reopen preview immediately.
+            if (returnToPreviewId && type === 'overlay') {
+                const id = returnToPreviewId;
+                returnToPreviewId = null;
+                openPreviewPanel(id);
+            } else {
+                returnToPreviewId = null; 
+            }
         }
 
         function closeBottomPanel() {
@@ -1906,7 +1917,13 @@
             
             resetDeletePointMode();
             removeAllWarpMarkers(); 
-            animateMapSqueeze(false);
+            
+            if (!returnToPreviewId) {
+                document.getElementById('map').classList.remove('map-squeezed');
+                document.getElementById('ui-layer').classList.remove('map-squeezed');
+                animateMapSqueeze(false);
+            }
+            
             updateOpacitySliderVisibility();
         }
 
@@ -2290,6 +2307,13 @@
                 renderOverlayList();
                 updateOpacitySliderVisibility();
                 saveMapState();
+                
+                // If saved during an edit session initiated from the preview panel, reopen preview immediately.
+                if (returnToPreviewId) {
+                    const returnId = returnToPreviewId;
+                    returnToPreviewId = null;
+                    openPreviewPanel(returnId);
+                }
             } catch(e) { 
                 console.error("IndexedDB Save Failed", e);
                 showAlert("Save Failed", "Could not save overlay data: " + e.message);
@@ -2462,16 +2486,19 @@
         function closePreviewPanel() {
             isPreviewPanelOpen = false;
             document.getElementById('preview-panel').classList.replace('panel-open', 'panel-closed');
-            document.getElementById('map').classList.remove('map-squeezed');
-            document.getElementById('ui-layer').classList.remove('map-squeezed');
+            
+            // Only unsqueeze the map if we aren't immediately transitioning to the edit panel
+            if (!returnToPreviewId) {
+                document.getElementById('map').classList.remove('map-squeezed');
+                document.getElementById('ui-layer').classList.remove('map-squeezed');
+                animateMapSqueeze(false);
+            }
             
             if (currentPreviewBlobUrl) {
                 URL.revokeObjectURL(currentPreviewBlobUrl);
                 currentPreviewBlobUrl = null;
             }
             currentPreviewId = null;
-            
-            animateMapSqueeze(false);
         }
 
         async function previewNext() {
@@ -2491,16 +2518,24 @@
         async function applyPreview() {
             if (currentPreviewId) {
                 const targetId = currentPreviewId;
-                // Load overlay silently without moving the camera yet
+                // Load overlay and center map dynamically underneath without closing the panel
                 await activateOverlay(targetId, true);
+                centerOnOverlay(targetId);
+            }
+        }
+        
+        async function editOverlayFromPreview() {
+            if (currentPreviewId) {
+                // Set the flag so the system remembers to return here upon canceling/saving
+                returnToPreviewId = currentPreviewId;
+                const idToEdit = currentPreviewId;
                 
-                // Close the preview panel (initiates the 350ms unsqueeze animation)
-                closePreviewPanel();
+                closePreviewPanel(); // (This will cleanly bypass the map unsqueeze due to the flag)
                 
-                // Wait for the panel animation to finish, then fly to the exact saved view
-                setTimeout(() => {
-                    centerOnOverlay(targetId);
-                }, 380);
+                if (activeOverlayId !== idToEdit) {
+                    await activateOverlay(idToEdit, true); // true = prevent fighting map perspective during transition
+                }
+                openPanelForEdit('overlay', idToEdit);
             }
         }
 
@@ -2532,7 +2567,6 @@
                         <div class="flex items-center space-x-1 shrink-0 bg-gray-50 dark:bg-gray-700 rounded-lg p-0.5">
                             <button onclick="openPreviewPanel('${o.id}')" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-indigo-600 dark:text-indigo-400 transition" title="Preview Image"><i data-lucide="image" class="w-4 h-4"></i></button>
                             <button onclick="centerOnOverlay('${o.id}')" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-gray-700 dark:text-gray-300 transition" title="Go to Saved View"><i data-lucide="crosshair" class="w-4 h-4"></i></button>
-                            <button onclick="editOverlayFromList('${o.id}')" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-blue-600 dark:text-blue-400 transition" title="Adjust"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
                             <button onclick="confirmDeleteOverlay('${o.id}')" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-red-600 dark:text-red-400 transition" title="Delete"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                         </div>
                     </div>
@@ -2540,11 +2574,6 @@
                 list.appendChild(item);
             });
             lucide.createIcons();
-        }
-
-        async function editOverlayFromList(id) {
-            if (activeOverlayId !== id) await activateOverlay(id);
-            openPanelForEdit('overlay', id);
         }
 
         function confirmDeleteOverlay(id) {
@@ -2560,6 +2589,10 @@
                 overlays = overlays.filter(o => o.id !== id);
                 await saveOverlaysMeta();
                 if (activeOverlayId === id) unloadOverlay();
+                
+                // Clear return state if the item was deleted from the edit panel while holding preview state
+                if (returnToPreviewId === id) returnToPreviewId = null;
+
                 closeModals();
                 closeBottomPanel();
                 if (isPreviewPanelOpen && currentPreviewId === id) closePreviewPanel();
