@@ -1226,6 +1226,24 @@
             lSlider.style.background = `linear-gradient(to right, #000, hsl(${h}, ${s}%, 50%), #fff)`;
         }
 
+        function toggleCustomColor(prefix) {
+            const panel = document.getElementById(`custom-panel-${prefix}`);
+            const text = document.getElementById(`toggle-text-${prefix}`);
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                panel.classList.add('flex');
+                text.innerText = 'Hide Custom Color';
+                
+                const hex = document.getElementById(prefix === 'marker' ? 'setting-color' : 'setting-nav-color').value;
+                const hsl = hexToHSL(hex);
+                updateSliderBackgrounds(prefix, hsl.h, hsl.s, hsl.l);
+            } else {
+                panel.classList.add('hidden');
+                panel.classList.remove('flex');
+                text.innerText = 'Custom Color';
+            }
+        }
+
         function toggleScaleSlider() {
             const enabled = document.getElementById('setting-scale-enabled').checked;
             const container = document.getElementById('scale-slider-container');
@@ -3385,6 +3403,24 @@
             showModal('compass-modal'); 
         }
         function escapeHTML(str) { return str.replace(/[&<>']/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)); }
+
+        function toggleCustomColor(prefix) {
+            const panel = document.getElementById(`custom-panel-${prefix}`);
+            const text = document.getElementById(`toggle-text-${prefix}`);
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                panel.classList.add('flex');
+                text.innerText = 'Hide Custom Color';
+                
+                const hex = document.getElementById(prefix === 'marker' ? 'setting-color' : 'setting-nav-color').value;
+                const hsl = hexToHSL(hex);
+                updateSliderBackgrounds(prefix, hsl.h, hsl.s, hsl.l);
+            } else {
+                panel.classList.add('hidden');
+                panel.classList.remove('flex');
+                text.innerText = 'Custom Color';
+            }
+        }
 
         // Boot
         window.onload = () => {
