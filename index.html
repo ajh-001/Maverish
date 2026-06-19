@@ -65,12 +65,25 @@
             transform: scale(var(--os-map-scale));
             transform-origin: top left;
         }
-        /* Scale back up control elements to keep them standard size */
+        /* Scale back up control elements to keep them standard size and anchored properly */
         #map.os-map-scaled .leaflet-control {
             transform: scale(var(--os-map-inv-scale)) !important;
-            transform-origin: center;
         }
+        #map.os-map-scaled .leaflet-top.leaflet-left .leaflet-control { transform-origin: top left; }
+        #map.os-map-scaled .leaflet-top.leaflet-right .leaflet-control { transform-origin: top right; }
+        #map.os-map-scaled .leaflet-bottom.leaflet-left .leaflet-control { transform-origin: bottom left; }
+        #map.os-map-scaled .leaflet-bottom.leaflet-right .leaflet-control { transform-origin: bottom right; }
         
+        /* Counter-scale map popups so they stay normal size */
+        #map.os-map-scaled .leaflet-popup-content-wrapper {
+            transform: scale(var(--os-map-inv-scale));
+            transform-origin: bottom center;
+        }
+        #map.os-map-scaled .leaflet-popup-tip-container {
+            transform: scale(var(--os-map-inv-scale));
+            transform-origin: top center;
+        }
+
         /* Counter-scale markers when OS Map is scaled down */
         #map.os-map-scaled .marker-scale-wrapper {
             transform: scale(var(--os-map-inv-scale));
@@ -404,7 +417,7 @@
             </div>
             <div class="flex items-center space-x-1.5 shrink-0">
                 <button onclick="closePreviewPanel()" class="px-3 py-2 text-gray-600 dark:text-gray-300 text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition">Cancel</button>
-                <button onclick="editOverlayFromPreview()" class="px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg transition">Edit</button>
+                <button id="preview-edit-btn" onclick="editOverlayFromPreview()" class="px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg transition">Edit</button>
                 <button onclick="applyPreview()" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 rounded-lg shadow-md transition">Apply</button>
             </div>
         </div>
@@ -1941,7 +1954,7 @@
         }
 
         // Sets up edit parameters for either point types or overlays
-        function openPanelForEdit(type, id) {
+        async function openPanelForEdit(type, id) {
             if (window.innerWidth < 768) closeDrawerIfOpen();
             if (isPreviewPanelOpen) closePreviewPanel();
             
@@ -1954,11 +1967,29 @@
                 const m = markers.find(x => x.id === id);
                 if (m) animateMapSqueeze(true, [m.lat, m.lng]);
             } else {
-                if (warpPoints.length > 0) {
-                    const validPts = warpPoints.filter(p => p.map);
-                    if (validPts.length > 0) animateMapSqueeze(true, [validPts[0].map.lat, validPts[0].map.lng]);
-                    else animateMapSqueeze(true);
-                } else {
+                try {
+                    const data = await idbKeyval.get(id);
+                    if (data && data.savedView) {
+                        let targetZoom = data.savedView.zoom;
+                        const currentIsOS = (currentMapType === 'os_combined');
+                        const savedIsOS = data.savedView.hasOwnProperty('isOS') ? data.savedView.isOS : (data.savedView.zoom <= 13 && currentMapType === 'os_combined');
+                        
+                        if (currentIsOS && !savedIsOS) {
+                            targetZoom = Math.max(0, Math.min(13, targetZoom - 6));
+                        } else if (!currentIsOS && savedIsOS) {
+                            targetZoom = Math.max(0, Math.min(19, targetZoom + 6));
+                        }
+                        
+                        map.flyTo([data.savedView.lat, data.savedView.lng], targetZoom, { animate: true, duration: 0.5 });
+                        animateMapSqueeze(true);
+                    } else if (warpPoints.length > 0) {
+                        const validPts = warpPoints.filter(p => p.map);
+                        if (validPts.length > 0) animateMapSqueeze(true, [validPts[0].map.lat, validPts[0].map.lng]);
+                        else animateMapSqueeze(true);
+                    } else {
+                        animateMapSqueeze(true);
+                    }
+                } catch(e) {
                     animateMapSqueeze(true);
                 }
             }
@@ -2465,6 +2496,16 @@
                 document.getElementById('preview-image').src = currentPreviewBlobUrl;
                 document.getElementById('preview-overlay-name').innerText = data.name;
                 currentPreviewId = id;
+                
+                // Update Edit Button Lock state
+                const editBtn = document.getElementById('preview-edit-btn');
+                if (id === activeOverlayId) {
+                    editBtn.disabled = false;
+                    editBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                } else {
+                    editBtn.disabled = true;
+                    editBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                }
             } catch(e) {
                 console.error("Preview load error", e);
             }
@@ -2521,6 +2562,13 @@
                 // Load overlay and center map dynamically underneath without closing the panel
                 await activateOverlay(targetId, true);
                 centerOnOverlay(targetId);
+                
+                // Unlock the edit button now that it is active
+                const editBtn = document.getElementById('preview-edit-btn');
+                if (editBtn) {
+                    editBtn.disabled = false;
+                    editBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
             }
         }
         
